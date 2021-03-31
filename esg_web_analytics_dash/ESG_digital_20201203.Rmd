@@ -1,0 +1,2935 @@
+---
+title: "ESG Program Automated Report"
+author: "NACG Enterprise Analytics"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+  toc: yes
+  toc_float: yes
+  code_folding: hide
+  df_print: kable
+---
+
+<img src="cglogo.png" style="position:absolute;top:0px;right:0px;" />
+ 
+<style type="text/css">
+ 
+<img src="cglogo.png" style="position:absolute;top:0px;left:0px;" />
+ 
+<style>
+
+p{
+     font-size:16px;
+     line-height:24px;
+     margin:0px 0px 12px 0px;
+}
+ 
+h1.title {
+ font-family:"AvenirNext LT Com Regular", sans-serif;
+ font-weight:700;
+ color: #005f9E;
+ text-align: center;
+}
+ 
+#content {
+     background: #FFFFFF;
+}
+ 
+0h1,h2,h3,h4,h5,h6,legend{
+     font-family:"AvenirNext LT Com Regular", sans-serif;
+     font-weight:700;
+     color: #002B49;
+}
+ 
+h4.author { /* Header 4 - and the author and data headers use this too  */
+   text-align: center;
+}
+
+h4.date { /* Header 4 - and the author and data headers use this too  */
+   text-align: center;
+}
+ 
+text-table-of-contents {
+ font-family: "Lato","proxima-nova","Helvetica Neue",Arial,sans-serif;
+}
+ 
+#table-of-contents h2 {
+     z-index: 200;
+     background-color: #005f9E;
+     text-align: center;
+     padding: 0.809em;
+     display: block;
+     color: #fcfcfc;
+     font-size: 100%;
+     margin-top: 0px;
+     margin-bottom: 0.809em;
+}
+ 
+#table-of-contents {
+ background: #02080d;
+ }
+ 
+#postamble {
+ background: 081c2b;
+ border: none;
+ border-top: solid 10px #02080d;
+     border-top-width: 10px;
+     border-top-style: solid;
+     border-top-color: rgb(2,8,13);;
+}
+</style>
+
+```{r setup, include=FALSE}
+library(rmdformats)
+library(odbc)
+library(DBI)
+library(ggplot2)
+library(stringr)
+library(RevoScaleR)
+library(tidyr)
+library(woe)
+library(woeBinning)
+library(rpart)
+library(rpart.plot)
+library(Information)
+library(gridExtra)
+library(lubridate)
+library(knitr)
+library(plyr)
+library(dplyr)
+library(Write2LASR)
+library(plotly)
+library(DT)
+library(rsconnect)
+library(shiny)
+library(shinydashboard)
+library(DBI)
+library(plotly)
+library(viridis)
+library(formattable)
+
+`%notin%` <- Negate(`%in%`)
+
+con <- dbConnect(odbc::odbc(), driver = "ODBC Driver 13 for SQL Server", 
+    server = "tcp:lasr-sqldwdb-eastus2-prd.database.windows.net", 
+    database = "lasr-sqldwdb-prd", UID = Sys.getenv("lasr_uid"), 
+    PWD = Sys.getenv("lasr_cloud_pwd"))
+options(scipen = 999)
+
+```
+
+```{r, include=FALSE}
+customRed = "#ff7f7f"
+customGreen = "#71CA97"
+percent <- function(x, digits = 1, format = "f", ...) {
+  paste0(formatC(x, format = format, digits = digits, ...), "%")
+}
+
+comma <- function(x, digits = digits, format = "f", ...) {
+  format(round(as.numeric(x), digits), nsmall=digits, big.mark=",")
+}
+
+`%notin%` <- Negate(`%in%`)
+
+color_text_format <- formatter("span", style = x ~ style(color = ifelse(x<0, "red", "green")))
+
+
+# CG Core palette
+sapphire <- "#005f9E"
+ocean <- "#009CDC"
+turquoise <- "#00AEA9"
+raspberry <- "#B42573"
+
+# Premium palette
+dark_sapphire <- "#002B49"
+copper <- "#AE7A67"
+light_copper <- "#C9AD9C"
+dark_copper <- "#764F47"
+
+# Informational palette
+## dark_sapphire, sapphire, ocean
+light_ocean <- "#7BD0E2"
+## turquoise
+dark_turquoise1 <- "#008E77"
+dark_turquoise2 <- "#008E77"
+dark_turquoise3 <- "#004C46"
+dark_raspberry1 <- "#762157"
+dark_raspberry2 <- "#532A45"
+neutral7 <- "#554742"
+neutral4 <- "#aca39a"
+neutral2 <- "#D5D0CA"
+
+# Fund Objective palette
+growth_fund_color <- "#002D72"
+growth_income_fund_color <- "#0057B8"
+equity_income_fund_color <- "#008EAA"
+allocation_fund_color <- "#6F928A"
+balanced_fund_color <- "#2DCCD3"
+taxable_fund_color <- "#00965E"
+#tax_exempt_fund_color <- "006C5B"
+mmf_fund_color <- neutral4
+fund_of_funds_allocation_color <- "#7c878e"
+  
+## OTHER PALETTES: Neutral palette, 
+alert_red <- "#D91943"
+
+cgPalette = c(sapphire, ocean, turquoise, raspberry, dark_sapphire, 
+              copper, light_copper, dark_copper, light_ocean, dark_turquoise1, 
+              dark_turquoise2, dark_turquoise3, dark_raspberry1, dark_raspberry2, neutral2, 
+              neutral4, neutral7, growth_fund_color, growth_income_fund_color, equity_income_fund_color, 
+              allocation_fund_color, balanced_fund_color, taxable_fund_color,  mmf_fund_color, fund_of_funds_allocation_color)
+
+improvement_formatter <- formatter("span", 
+                                   style = x ~ formattable::style(font.weight = "bold", 
+                                                     color = ifelse(x > 0, customGreen, ifelse(x < 0, customRed, "black"))), 
+                                   x ~ icontext(ifelse(x>0, "arrow-up", "arrow-down"), x)
+                                   )
+improvement_formatter_opp <- formatter("span", 
+                                   style = x ~ formattable::style(font.weight = "bold", 
+                                                     color = ifelse(x < 0, customGreen, ifelse(x > 0, customRed, "black"))), 
+                                   x ~ icontext(ifelse(x>0, "arrow-up", "arrow-down"), x))
+```
+
+```{sql connection=con, output.var='raw.web', include=FALSE}
+select * from MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB
+```	
+
+```{sql connection=con, output.var='raw.journey', include=FALSE}
+select * from MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY
+```
+
+```{sql connection=con, output.var='raw.sfdc', include=FALSE}
+SELECT
+	p1.ID as x18_character_contact_id__c,
+	p1.LASTNAME,
+	p1.FIRSTNAME,
+	p1.NAME,
+	p1.parent_organization__C,
+	ACCOUNT.MARKETING_REGION__C,
+	p1.MailingCountry,
+	case when ACCOUNT.MARKETING_REGION__C is not null 
+		and ACCOUNT.MARKETING_REGION__C not like 'US %' 
+		and ACCOUNT.MARKETING_REGION__C not like 'West Indies' 
+		and ACCOUNT.MARKETING_REGION__C not like 'Canada' 
+		and ACCOUNT.MARKETING_REGION__C not like 'Latin America' then 1 else 0 end as EACG_FLAG, 
+	CASE WHEN ACCOUNT.MARKETING_REGION__C in('FIT Austria',
+										'FIT Benelux',
+										'FIT France',
+										'FIT Germany',
+										'FIT Italy',
+										'FIT NRC',
+										'FIT Spain',
+										'FIT Switzerland',
+										'FIT UK',
+										'IB Austria',
+										'IB Benelux',
+										'IB Europe Other',
+										'IB France',
+										'IB Germany',
+										'IB Middle East',
+										'IB Nordics',
+										'IB Switzerland',
+										'IB UK') THEN 'EUROPE' ELSE 'OTHER OUS' END AS REGION 
+From [MSS_S_SFDC_S].[VW_SFDC_CONTACT_CURRENT] p1
+left join [MSS_S_SFDC_S].[vw_Sfdc_account_CURRENT] ACCOUNT
+	ON P1.ACCOUNTID = ACCOUNT.ID
+	where 1=1
+```
+
+
+```{sql connection=con, output.var='video_esg', include=FALSE}
+SELECT
+VIDEONAME
+, CASE WHEN VIDEONAME LIKE '%/video-esg-ea-approach-our-approach-AVS%' 
+		 OR VIDEONAME LIKE '%/video-esg-ea-approach-mining-AVS%' 
+		 OR VIDEONAME LIKE '%/video-esg-ea-home-our-commitment-AVS%'
+	     OR VIDEONAME LIKE '%/video-esg-ea-healthcare-AVS%' THEN 'EACG'
+		 ELSE 'NACG' END REGION_PLACEMENT
+, SUM(VIDEOPLAY) STARTS
+, SUM(VIDEOCOMPLETE) COMPLETES
+, ROUND(CAST(SUM(VIDEOCOMPLETE) AS FLOAT)/SUM(VIDEOPLAY),2)*100 COMPLETION_PCT
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB
+WHERE ESG_PAGE_FLAG = 'ESG Page'
+AND VIDEONAME IS NOT NULL
+GROUP BY VIDEONAME
+ORDER BY SUM(VIDEOPLAY) DESC
+```
+
+```{sql connection=con, output.var='pv_esg', include=FALSE}
+SELECT 
+ROUND(AVG(CAST(ESG_Views AS FLOAT)),2) AVERAGE_PV
+, ROUND((CAST(SUM(CASE WHEN ESG_Views > 1 THEN 1 ELSE 0 END) AS FLOAT)/COUNT(*))*100,1) PERCENT_MULTIPLE_PV
+FROM	(SELECT 
+		 SUM(CASE WHEN ESG_PAGE_FLAG = 'ESG Page' THEN 1 ELSE 0 END) AS ESG_Views
+		 FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB
+		 WHERE MO_NUM > 202010 
+		 AND PAGEVIEWCOUNT = 1 
+		 GROUP BY VISITSOURCEID) a
+```
+
+```{sql connection=con, output.var='raw.nonesgweb', include=FALSE}
+SELECT 
+ROUND(CAST(COUNT(DISTINCT CASE WHEN BOUNCED = 1 THEN VISITSOURCEID END) AS FLOAT)/COUNT(DISTINCT VISITSOURCEID)*100,2)
+FROM MSS_U_MKTPOD_S.DEV_KPMTYW_NON_ESG_WEB
+```
+
+```{sql connection=con, output.var='all.benchmark', include=FALSE}
+select
+homepage_flag
+,'All visits' AS VisitType
+,ROUND(CAST(SUM(Known_Individuals) AS FLOAT)/SUM(Unique_Visitors),3)*100 PercentKnownVisitors
+,ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM([Page Views]),2) TimeSpentPerPageview
+,ROUND(CAST(SUM(Bounces) AS FLOAT)/SUM(Visits),3)*100 BounceRate
+from [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_LANDINGPAGE_BENCHMARK]
+GROUP BY homepage_flag
+```
+
+```{sql connection=con, output.var='organic.benchmark', include=FALSE}
+select
+homepage_flag
+,'Organic' AS VisitType
+,ROUND(CAST(SUM(Known_Individuals) AS FLOAT)/SUM(Unique_Visitors),3)*100 PercentKnownVisitors
+,ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM([Page Views]),2) TimeSpentPerPageview
+,ROUND(CAST(SUM(Bounces) AS FLOAT)/SUM(Visits),3)*100 BounceRate
+from [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_LANDINGPAGE_BENCHMARK]
+WHERE TrafficSourceType = 'Organic'
+GROUP BY homepage_flag
+```
+
+```{sql connection=con, output.var='inorganic.benchmark', include=FALSE}
+select
+homepage_flag
+,'Inorganic' AS VisitType
+,ROUND(CAST(SUM(Known_Individuals) AS FLOAT)/SUM(Unique_Visitors),3)*100 PercentKnownVisitors
+,ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM([Page Views]),2) TimeSpentPerPageview
+,ROUND(CAST(SUM(Bounces) AS FLOAT)/SUM(Visits),3)*100 BounceRate
+from [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_LANDINGPAGE_BENCHMARK]
+WHERE TrafficSourceType = 'Inorganic'
+GROUP BY homepage_flag
+```
+
+```{sql connection=con, output.var='nonesg.benchmark', include=FALSE}
+SELECT 
+ROUND(CAST(SUM(Bounces) AS FLOAT)/SUM(Visits),3)*100 NonESGBounceRate
+, ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM([Page Views]), 2) NonESGTimeSpentPerPageview
+, ROUND(CAST(SUM(Known_Individuals) AS FLOAT)/SUM(Unique_Visitors),3)*100 NonESGKnownPct
+FROM [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_LANDINGPAGE_BENCHMARK]
+WHERE homepage_flag <> 'ESG Home'
+```
+
+```{sql connection=con, output.var='all.journey_bench', include=FALSE}
+SELECT 
+Journey_Type
+, SUM(Visits) Visits 
+, SUM(Unique_Visitors) AS UniqueVisitors
+, ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM(Visits),2) TimespentPerVisit
+, ROUND(CAST(SUM([Page Views]) AS FLOAT)/SUM(Visits),2) AS PageViewsPerVisit
+FROM [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_JOURNEY_BENCHMARK]
+GROUP BY Journey_Type
+```
+
+```{sql connection=con, output.var='all.journey_organic', include=FALSE}
+SELECT 
+Journey_Type
+, SUM(Visits) Visits 
+, SUM(Unique_Visitors) AS UniqueVisitors
+, ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM(Visits),2) TimespentPerVisit
+, ROUND(CAST(SUM([Page Views]) AS FLOAT)/SUM(Visits),2) AS PageViewsPerVisit
+FROM [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_JOURNEY_BENCHMARK]
+WHERE TrafficSourceType = 'Organic'
+GROUP BY Journey_Type
+```
+
+```{sql connection=con, output.var='all.journey_inorganic', include=FALSE}
+SELECT 
+Journey_Type
+, SUM(Visits) Visits 
+, SUM(Unique_Visitors) AS UniqueVisitors
+, ROUND(CAST(SUM([Total Time Spent (min)]) AS FLOAT)/SUM(Visits),2) TimespentPerVisit
+, ROUND(CAST(SUM([Page Views]) AS FLOAT)/SUM(Visits),2) AS PageViewsPerVisit
+FROM [MSS_U_MKTPOD_S].[DEV_CKZ_ENT_JOURNEY_BENCHMARK]
+WHERE TrafficSourceType = 'Inorganic'
+GROUP BY Journey_Type
+```
+
+
+```{r, include=FALSE}
+country.mapping <- read.csv('/users/teams/nad/kpmtyw/ESG/Country_name_code.csv')
+```
+
+```{r, include=FALSE}
+taxonomy.mapping <- read.csv('/users/teams/nad/kpmtyw/ESG/ESG_url_taxonomy.csv')
+```
+
+
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+
+country.mapping <- country.mapping %>% rename(CN = Country_name) %>% mutate(CN = as.character(CN))
+
+clean.web <- raw.web %>%
+  left_join(select(raw.sfdc,  x18_character_contact_id__c, parent_organization__C, MailingCountry), by = c('X18_CES_ID' = 'x18_character_contact_id__c')) %>% ## join on full SFDC profiles for PII
+  left_join(country.mapping %>% mutate(CC1 = as.character(Country_code)), by=c('MailingCountry' = 'CN')) %>% ## to get country code against SFDC country field
+  left_join(country.mapping %>% mutate(CC2 = as.character(Country_code)), by=c('Country_Name' = 'CN')) %>% ## to get country code against Server names
+  mutate(agg.firm.name = coalesce(parent_organization__C, FIRM_NAME),
+         agg.country = coalesce(CC1, CC2, COUNTRY, Country_Name),
+         agg.firm.name.country = paste(agg.firm.name, '-', agg.country), 
+         visitor.type = ifelse(!is.na(X18_CES_ID), 'Known Intermediaries', 
+                               ifelse(VISITOR_TYPE == "INVESTOR", VISITOR_TYPE, 
+                                      ifelse(!is.na(agg.firm.name), 'Likely Intermediaries', VISITOR_TYPE))), 
+         OLDPERCENTVIEWED = as.integer(ifelse(is.na(OLDPERCENTVIEWED), 0, OLDPERCENTVIEWED)), 
+         NEWPERCENTVIEWED = as.integer(ifelse(is.na(NEWPERCENTVIEWED), 0, NEWPERCENTVIEWED)), 
+         
+         Mobile_flag = ifelse(str_detect(OPERATINGSYSTEM, 'iOS') | str_detect(OPERATINGSYSTEM, 'Mobile') |
+                              str_detect(OPERATINGSYSTEM, 'iPad') | str_detect(OPERATINGSYSTEM, 'Android') |
+                              str_detect(OPERATINGSYSTEM, 'Symbian') | str_detect(OPERATINGSYSTEM, 'Phone') , 'Mobile', 'Non Mobile'
+                              )
+         
+         ) 
+
+```
+
+
+Updated on `r Sys.Date()`, included data as of `r lubridate::ymd(max(as.Date(raw.web$HITDATETIME)))`. This tool is scheduled to update on 10am PST weekdays.
+
+<br>
+
+## Overview {.tabset}
+
+This dashboard tracks the performance of ESG webpages across NACG and EACG sites. Below are summaries of performance over time, across countries, paid media channels,
+visitor types, and web journeys. The table of contents bar to the left provides easy navigate to different sections.
+
+
+```{r, warning = FALSE, message = FALSE, include=FALSE}
+taxonomy.short <- taxonomy.mapping %>% select(URL.short, Content.theme)
+```
+
+
+```{r, include=FALSE}
+Nov_release <- as.numeric(difftime(max(as.Date(raw.web$HITDATETIME)), as.Date("2020-11-01"), units = "days")/30.4167)
+Dec_release <- as.numeric(difftime(max(as.Date(raw.web$HITDATETIME)), as.Date("2020-12-01"), units = "days")/30.4167)
+Jan_release <- as.numeric(difftime(max(as.Date(raw.web$HITDATETIME)), as.Date("2020-12-01"), units = "days")/30.4167)
+
+
+Nov_release_pre <- as.numeric(difftime(as.Date("2020-10-31"), min(as.Date(raw.web$HITDATETIME)), units = "days")/30.4167)
+Dec_release_pre <- as.numeric(difftime(as.Date("2020-11-30"), min(as.Date(raw.web$HITDATETIME)), units = "days")/30.4167)
+Jan_release_pre <- as.numeric(difftime(as.Date("2020-12-31"), min(as.Date(raw.web$HITDATETIME)), units = "days")/30.4167)
+
+today <- max(as.Date(raw.web$HITDATETIME))
+today_one_year_ago<- today - 366
+
+summ.visit <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page")$VISITSOURCEID)
+
+summ.US_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010 & Country_Code == 'US')$VISITSOURCEID)/Nov_release
+summ.US_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202011 & Country_Code == 'US')$VISITSOURCEID)/Nov_release_pre
+summ.US_delt <- (summ.US_post - summ.US_pre)/summ.US_pre
+
+summ.UK_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202011 & Country_Code == 'GB')$VISITSOURCEID)/Dec_release
+summ.UK_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202012 & Country_Code == 'GB')$VISITSOURCEID)/Dec_release_pre
+summ.UK_delt <- (summ.UK_post - summ.UK_pre)/summ.UK_pre
+
+summ.sing_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202011 & Country_Code == 'SG')$VISITSOURCEID)/Dec_release
+summ.sing_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202012 & Country_Code == 'SG')$VISITSOURCEID)/Dec_release_pre
+summ.sing_delt <- (summ.sing_post - summ.sing_pre)/summ.sing_pre
+
+summ.ire_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202011 & Country_Code == 'IE')$VISITSOURCEID)/Dec_release
+summ.ire_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202012 & Country_Code == 'IE')$VISITSOURCEID)/Dec_release_pre
+summ.ire_delt <- (summ.ire_post - summ.ire_pre)/summ.ire_pre
+
+summ.au_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202011 &  Country_Code == 'AU')$VISITSOURCEID)/Dec_release
+summ.au_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202012 & Country_Code == 'AU')$VISITSOURCEID)/Dec_release_pre
+summ.au_delt <- (summ.au_post - summ.au_pre)/summ.au_pre
+
+summ.es_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202012 & Country_Code == 'ES')$VISITSOURCEID)/Jan_release
+summ.es_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202101 & Country_Code == 'ES')$VISITSOURCEID)/Jan_release_pre
+summ.es_delt <- (summ.es_post - summ.es_pre)/summ.es_pre
+
+summ.it_post <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202012 & Country_Code == 'IT')$VISITSOURCEID)/Jan_release
+summ.it_pre <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM < 202101 & Country_Code == 'IT')$VISITSOURCEID)/Jan_release_pre
+summ.it_delt <- (summ.it_post - summ.it_pre)/summ.it_pre
+
+summ.2020 <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & date >= "2020-01-01" & date <= today_one_year_ago)$VISITSOURCEID)
+summ.2021 <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page" & date >= "2021-01-01" & date <= today)$VISITSOURCEID)
+summ.yoy <- (summ.2021 - summ.2020)/summ.2020
+
+
+
+summ.bounceRate1 <- clean.web %>%
+  filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  summarise(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2))
+
+summ.bounceRate <- clean.web %>%
+  filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  summarise(paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  as.character()
+
+summ.countries <- n_distinct(filter(raw.web, ESG_PAGE_FLAG == "ESG Page")$Country_Name)
+
+summ.visit.agg <- clean.web %>%
+  filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(Country_Name) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.channel.agg <-clean.web %>%
+  filter(ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>%
+  group_by(TrafficSourceRefined) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.content.agg <- clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>%
+  group_by(URL.short) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.org.agg <- clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page"  & Country_Code == 'US' & MO_NUM > 202010) %>%
+  group_by(agg.firm.name) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.pod.agg <- clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page"  & Country_Code == 'US' & MO_NUM > 202010) %>%
+  group_by(POD_ASSIGNMENT) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.seg.agg <- clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page" & Country_Code == 'US' & MO_NUM > 202010) %>%
+  group_by(RETAIL_SEGMENTATION) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.org.agg_eacg <- clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page"  & Country_Code != 'US' & MO_NUM > 202010) %>%
+  group_by(agg.firm.name) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+
+summ.site.agg_eacg <- filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name) & Country_Code != 'US') %>%
+  group_by(USERSERVER) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+summ.site.agg_nacg <- filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name) & Country_Code == 'US' & USERSERVER != '#') %>%
+  group_by(USERSERVER) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  mutate(v.rank = dense_rank(desc(visits)))
+
+eacg_sections <- filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010 & !is.na(Country_Name) & Country_Code != 'US') %>% 
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  inner_join(taxonomy.short, c('URL.short' = 'URL.short')) %>%
+  group_by(Content.theme) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+    mutate(v.rank = dense_rank(desc(visits)))
+
+nacg_sections <- filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010 & !is.na(Country_Name) & Country_Code == 'US') %>% 
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  inner_join(taxonomy.short, c('URL.short' = 'URL.short')) %>%
+  group_by(Content.theme) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+    mutate(v.rank = dense_rank(desc(visits)))
+
+
+
+raw.bounceDiff = (summ.bounceRate1 - raw.nonesgweb)/100
+
+
+average_views = as.vector(pv_esg$AVERAGE_PV[1])
+
+
+pct_multiple = paste(as.vector(pv_esg$PERCENT_MULTIPLE_PV[1]),'%')
+
+
+x <- filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010 & PAGEVIEWCOUNT == 1) %>% 
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  inner_join(taxonomy.short, c('URL.short' = 'URL.short')) %>%
+  mutate(home_flag = case_when(Content.theme == 'home' ~ 1, Content.theme != 'home' ~ 0)) %>% 
+  group_by(VISITSOURCEID) %>%
+  summarise(home_agg = mean(home_flag), .groups = 'drop')
+
+only_home <- round(count(filter(x, home_agg == 1))/count(x)*100,1)
+
+mortar <- 0.333 - (150320/(516989+150320))
+
+mortar_ave = average_views - 1.42
+```
+
+
+
+## Key Insights
+* Year-to-date in 2021, there have been <b>`r summ.2021`</b> ESG visits, **`r improvement_formatter(formattable::percent(summ.yoy,0))`** compared to the same time last year. 
+
+* The average number of ESG pageviews per visit is <b>`r average_views`</b> (**`r improvement_formatter(mortar_ave)`** compared to Mortar), and <b>`r pct_multiple`</b> of visits with an ESG pageview visit multiple ESG pages (**`r improvement_formatter(formattable::percent(mortar,0))`** compared to Mortar). 
+
+* Across EACG and NACG, <b>`r only_home`%</b> of ESG visits never leave the <b>"home"</b> site section. Following <b>"home"</b>, the most visited section is <b>"`r filter(nacg_sections, v.rank == 2)$Content.theme`"</b> on the NACG site (<b>`r filter(nacg_sections, v.rank == 2)$visits`</b> visits) and <b>"`r filter(eacg_sections, v.rank == 2)$Content.theme`"</b> on the EACG site (<b>`r filter(eacg_sections, v.rank == 2)$visits`</b> visits). 
+
+* The aggregated bounce rate across the ESG experience is <b>`r summ.bounceRate`</b>, **`r improvement_formatter_opp(formattable::percent(raw.bounceDiff,1))`** compared to non-ESG CG webpages. 
+
+* Since Jan 2020, there have been <b>`r summ.visit`</b> web visits to ESG related web pages from across <b>`r summ.countries`</b> countries. 
+
+
+## High-level Summary {.tabset}
+
+### Country
+  * Since the launch of the new ESG experience:
+    * The US site has an average of <b>`r round(summ.US_post, 1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.US_delt,0))`** compared to pre-launch.  
+    * The Singapore site has an average of <b>`r round(summ.sing_post,1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.sing_delt,0))`** compared to pre-launch.  
+    * The UK site has an average of <b>`r round(summ.UK_post,1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.UK_delt,0))`** compared to pre-launch.
+    * The Australia site has an average of <b>`r round(summ.au_post,1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.au_delt,0))`** compared to pre-launch. 
+    * The Spain site has an average of <b>`r round(summ.es_post,1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.es_delt,0))`** compared to pre-launch.  
+    * The Italy site has an average of <b>`r round(summ.it_post,1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.it_delt,0))`** compared to pre-launch.  
+    * The Ireland site has an average of <b>`r round(summ.ire_post,1)`</b> visits per month, **`r improvement_formatter(formattable::percent(summ.ire_delt,0))`** compared to pre-launch. 
+
+
+### ESG Content and Traffic Sources
+* Top five NACG site sections (November 2020 - Present). For more detail report, please visit the <b> Content usage </b> section of this analysis. 
+    * `r filter(nacg_sections, v.rank == 1)$Content.theme` with <b>`r filter(nacg_sections, v.rank == 1)$visits`</b> visits at `r filter(nacg_sections, v.rank == 1)$bource.rate` bounce rate. 
+    * `r filter(nacg_sections, v.rank == 2)$Content.theme` with <b>`r filter(nacg_sections, v.rank == 2)$visits`</b> visits at `r filter(nacg_sections, v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(nacg_sections, v.rank == 3)$Content.theme` with <b>`r filter(nacg_sections, v.rank == 3)$visits`</b> visits at `r filter(nacg_sections, v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(nacg_sections, v.rank == 4)$Content.theme` with <b>`r filter(nacg_sections, v.rank == 4)$visits`</b> visits at `r filter(nacg_sections, v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(nacg_sections, v.rank == 5)$Content.theme` with <b>`r filter(nacg_sections, v.rank == 5)$visits`</b> visits at `r filter(nacg_sections, v.rank == 5)$bource.rate` bounce rate.
+* Top five EACG site sections (November 2020 - Present).
+    * `r filter(eacg_sections, v.rank == 1)$Content.theme` with <b>`r filter(eacg_sections, v.rank == 1)$visits`</b> visits at `r filter(eacg_sections, v.rank == 1)$bource.rate` bounce rate. 
+    * `r filter(eacg_sections, v.rank == 2)$Content.theme` with <b>`r filter(eacg_sections, v.rank == 2)$visits`</b> visits at `r filter(eacg_sections, v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(eacg_sections, v.rank == 3)$Content.theme` with <b>`r filter(eacg_sections, v.rank == 3)$visits`</b> visits at `r filter(eacg_sections, v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(eacg_sections, v.rank == 4)$Content.theme` with <b>`r filter(eacg_sections, v.rank == 4)$visits`</b> visits at `r filter(eacg_sections, v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(eacg_sections, v.rank == 5)$Content.theme` with <b>`r filter(eacg_sections, v.rank == 5)$visits`</b> visits at `r filter(eacg_sections, v.rank == 5)$bource.rate` bounce rate.
+* Top ten ESG URLs are listed below  (November 2020 - Present).
+    * `r filter(summ.content.agg, v.rank == 1)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 1)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 1)$bource.rate` bounce rate. 
+    * `r filter(summ.content.agg, v.rank == 2)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 2)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.content.agg, v.rank == 3)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 3)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 4)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 4)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 5)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 5)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 5)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 6)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 6)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 6)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 7)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 7)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 7)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 8)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 8)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 8)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 9)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 9)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 9)$bource.rate` bounce rate.
+    * `r filter(summ.content.agg, v.rank == 10)$URL.short` with <b>`r filter(summ.content.agg, v.rank == 10)$visits`</b> visits at `r filter(summ.content.agg, v.rank == 10)$bource.rate` bounce rate.
+* Top three traffic drivers are listed below  (November 2020 - Present).
+    * `r filter(summ.channel.agg, v.rank == 1)$TrafficSourceRefined` with <b>`r filter(summ.channel.agg, v.rank == 1)$visits`</b> visits at `r filter(summ.channel.agg, v.rank == 1)$bource.rate` bounce rate. 
+    * `r filter(summ.channel.agg, v.rank == 2)$TrafficSourceRefined` with <b>`r filter(summ.channel.agg, v.rank == 2)$visits`</b> visits at `r filter(summ.channel.agg, v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.channel.agg, v.rank == 3)$TrafficSourceRefined` with <b>`r filter(summ.channel.agg, v.rank == 3)$visits`</b> visits at `r filter(summ.channel.agg, v.rank == 3)$bource.rate` bounce rate.    
+
+
+
+   
+### Audience - NACG
+* Top five Institutions visiting ESG pages are listed below, for more detail report, please visit the <b> Audience usage </b> section of this analysis.  
+    * `r filter(summ.org.agg , v.rank == 2)$agg.firm.name` with <b>`r filter(summ.org.agg , v.rank == 2)$visits`</b> visits at `r filter(summ.org.agg , v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.org.agg , v.rank == 3)$agg.firm.name` with <b>`r filter(summ.org.agg , v.rank == 3)$visits`</b> visits at `r filter(summ.org.agg , v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(summ.org.agg , v.rank == 4)$agg.firm.name` with <b>`r filter(summ.org.agg , v.rank == 4)$visits`</b> visits at `r filter(summ.org.agg , v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(summ.org.agg , v.rank == 5)$agg.firm.name` with <b>`r filter(summ.org.agg , v.rank == 5)$visits`</b> visits at `r filter(summ.org.agg , v.rank == 5)$bource.rate` bounce rate.
+    * `r filter(summ.org.agg , v.rank == 6)$agg.firm.name` with <b>`r filter(summ.org.agg , v.rank == 6)$visits`</b> visits at `r filter(summ.org.agg , v.rank == 6)$bource.rate` bounce rate.
+* Top five Pods visiting ESG pages are listed below, for more detail report, please visit the <b> Audience usage </b> section of this analysis.  
+    * `r filter(summ.pod.agg , v.rank == 2)$POD_ASSIGNMENT` with <b>`r filter(summ.pod.agg , v.rank == 2)$visits`</b> visits at `r filter(summ.pod.agg , v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.pod.agg , v.rank == 3)$POD_ASSIGNMENT` with <b>`r filter(summ.pod.agg , v.rank == 3)$visits`</b> visits at `r filter(summ.pod.agg , v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(summ.pod.agg , v.rank == 4)$POD_ASSIGNMENT` with <b>`r filter(summ.pod.agg , v.rank == 4)$visits`</b> visits at `r filter(summ.pod.agg , v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(summ.pod.agg , v.rank == 5)$POD_ASSIGNMENT` with <b>`r filter(summ.pod.agg , v.rank == 5)$visits`</b> visits at `r filter(summ.pod.agg , v.rank == 5)$bource.rate` bounce rate.
+    * `r filter(summ.pod.agg , v.rank == 6)$POD_ASSIGNMENT` with <b>`r filter(summ.pod.agg , v.rank == 6)$visits`</b> visits at `r filter(summ.pod.agg , v.rank == 6)$bource.rate` bounce rate.
+* Top five Retail Segments visiting ESG pages are listed below, for more detail report, please visit the <b> Audience usage </b> section of this analysis.  
+    * `r filter(summ.seg.agg , v.rank == 2)$RETAIL_SEGMENTATION` with <b>`r filter(summ.seg.agg , v.rank == 2)$visits`</b> visits at `r filter(summ.seg.agg , v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.seg.agg , v.rank == 3)$RETAIL_SEGMENTATION` with <b>`r filter(summ.seg.agg , v.rank == 3)$visits`</b> visits at `r filter(summ.seg.agg , v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(summ.seg.agg , v.rank == 4)$RETAIL_SEGMENTATION` with <b>`r filter(summ.seg.agg , v.rank == 4)$visits`</b> visits at `r filter(summ.seg.agg , v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(summ.seg.agg , v.rank == 5)$RETAIL_SEGMENTATION` with <b>`r filter(summ.seg.agg , v.rank == 5)$visits`</b> visits at `r filter(summ.seg.agg , v.rank == 5)$bource.rate` bounce rate.
+    * `r filter(summ.seg.agg , v.rank == 6)$RETAIL_SEGMENTATION` with <b>`r filter(summ.seg.agg , v.rank == 6)$visits`</b> visits at `r filter(summ.seg.agg , v.rank == 6)$bource.rate` bounce rate.
+* Breakdown of Individual vs Advisor vs Institutional sites.
+    * `r filter(summ.site.agg_nacg , v.rank == 1)$USERSERVER` with <b>`r filter(summ.site.agg_nacg , v.rank == 1)$visits`</b> visits at `r filter(summ.site.agg_nacg, v.rank == 1)$bource.rate` bounce rate. 
+    * `r filter(summ.site.agg_nacg , v.rank == 2)$USERSERVER` with <b>`r filter(summ.site.agg_nacg , v.rank == 2)$visits`</b> visits at `r filter(summ.site.agg_nacg, v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.site.agg_nacg , v.rank == 3)$USERSERVER` with <b>`r filter(summ.site.agg_nacg , v.rank == 3)$visits`</b> visits at `r filter(summ.site.agg_nacg , v.rank == 3)$bource.rate` bounce rate.
+
+
+### Audience - EACG
+* Top five Institutions visiting ESG pages are listed below, for more detail report, please visit the <b> Audience usage </b> section of this analysis.  
+    * `r filter(summ.org.agg_eacg, v.rank == 2)$agg.firm.name` with <b>`r filter(summ.org.agg_eacg , v.rank == 2)$visits`</b> visits at `r filter(summ.org.agg_eacg , v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.org.agg_eacg, v.rank == 3)$agg.firm.name` with <b>`r filter(summ.org.agg_eacg , v.rank == 3)$visits`</b> visits at `r filter(summ.org.agg_eacg , v.rank == 3)$bource.rate` bounce rate.
+    * `r filter(summ.org.agg_eacg, v.rank == 4)$agg.firm.name` with <b>`r filter(summ.org.agg_eacg , v.rank == 4)$visits`</b> visits at `r filter(summ.org.agg_eacg , v.rank == 4)$bource.rate` bounce rate.
+    * `r filter(summ.org.agg_eacg , v.rank == 5)$agg.firm.name` with <b>`r filter(summ.org.agg_eacg , v.rank == 5)$visits`</b> visits at `r filter(summ.org.agg_eacg , v.rank == 5)$bource.rate` bounce rate.
+    * `r filter(summ.org.agg_eacg , v.rank == 6)$agg.firm.name` with <b>`r filter(summ.org.agg_eacg , v.rank == 6)$visits`</b> visits at `r filter(summ.org.agg_eacg , v.rank == 6)$bource.rate` bounce rate.
+* Breakdown of INST vs FIT vs IND sites.  
+    * `r filter(summ.site.agg_eacg , v.rank == 1)$USERSERVER` with <b>`r filter(summ.site.agg_eacg , v.rank == 1)$visits`</b> visits at `r filter(summ.site.agg_eacg, v.rank == 1)$bource.rate` bounce rate. 
+    * `r filter(summ.site.agg_eacg , v.rank == 2)$USERSERVER` with <b>`r filter(summ.site.agg_eacg , v.rank == 2)$visits`</b> visits at `r filter(summ.site.agg_eacg, v.rank == 2)$bource.rate` bounce rate. 
+    * `r filter(summ.site.agg_eacg , v.rank == 3)$USERSERVER` with <b>`r filter(summ.site.agg_eacg , v.rank == 3)$visits`</b> visits at `r filter(summ.site.agg_eacg , v.rank == 3)$bource.rate` bounce rate.
+
+
+## Homepage benchmarks {.tabset}
+
+
+
+* Here ESG content performance is compared to other Enterprise pods (FI, PM, PC, CI, PM, and Mortar). Please note that while this is meant to provide broader context to ESG performance, it is not meant to rank campaigns.
+
+* Visitors spend and average of <b>`r select(filter(all.benchmark, homepage_flag=='ESG Home'), TimeSpentPerPageview)` </b> minutes per pageview on the ESG Home page, compared to <b>`r nonesg.benchmark$NonESGTimeSpentPerPageview`</b> minutes per pageview for non-ESG Enterprise pod pages (**`r improvement_formatter(select(filter(all.benchmark, homepage_flag=='ESG Home'), TimeSpentPerPageview) - nonesg.benchmark$NonESGTimeSpentPerPageview)`** minutes).
+
+* The bounce rate for the ESG home page is <b>`r select(filter(all.benchmark, homepage_flag=='ESG Home'), BounceRate)`% </b>, compared to <b>`r nonesg.benchmark$NonESGBounceRate`%</b> for non-ESG pages (**`r improvement_formatter_opp(select(filter(all.benchmark, homepage_flag=='ESG Home'), BounceRate) - nonesg.benchmark$NonESGBounceRate)`**%).
+
+
+* Known individuals make up <b>`r select(filter(all.benchmark, homepage_flag=='ESG Home'), PercentKnownVisitors)`% </b> of ESG visits, compared to <b>`r nonesg.benchmark$NonESGKnownPct`%</b> for non-ESG pages (**`r improvement_formatter(select(filter(all.benchmark, homepage_flag=='ESG Home'), PercentKnownVisitors) - nonesg.benchmark$NonESGKnownPct)`**%).
+
+### All
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+datatable(all.benchmark
+  ,  filter="top"
+) %>% formatStyle('PercentKnownVisitors', background = styleColorBar(all.benchmark$PercentKnownVisitors, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('TimeSpentPerPageview', background = styleColorBar(all.benchmark$TimeSpentPerPageview, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('BounceRate', background = styleColorBar(all.benchmark$BounceRate, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle(0, target='row', fontWeight = styleEqual(5, "bold"))
+```
+
+### Organic
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+datatable(organic.benchmark
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+) %>% formatStyle('PercentKnownVisitors', background = styleColorBar(organic.benchmark$PercentKnownVisitors, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('TimeSpentPerPageview', background = styleColorBar(organic.benchmark$TimeSpentPerPageview, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('BounceRate', background = styleColorBar(organic.benchmark$BounceRate, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle(0, target='row', fontWeight = styleEqual(5, "bold"))
+```
+
+### Inorganic
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+datatable(inorganic.benchmark
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+) %>% formatStyle('PercentKnownVisitors', background = styleColorBar(inorganic.benchmark$PercentKnownVisitors, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('TimeSpentPerPageview', background = styleColorBar(inorganic.benchmark$TimeSpentPerPageview, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('BounceRate', background = styleColorBar(inorganic.benchmark$BounceRate, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle(0, target='row', fontWeight = styleEqual(5, "bold"))
+```
+
+## Journey benchmarks {.tabset}
+
+### All
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+datatable(all.journey_bench
+  ,  filter="top"
+) %>% formatStyle('Visits', background = styleColorBar(all.journey_bench$Visits, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('UniqueVisitors', background = styleColorBar(all.journey_bench$UniqueVisitors, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('TimespentPerVisit', background = styleColorBar(all.journey_bench$TimespentPerVisit, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('PageViewsPerVisit', background = styleColorBar(all.journey_bench$PageViewsPerVisit, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle(0, target='row', fontWeight = styleEqual(2, "bold"))
+```
+
+### Organic
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+datatable(all.journey_organic
+  ,  filter="top"
+) %>% formatStyle('Visits', background = styleColorBar(all.journey_organic$Visits, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('UniqueVisitors', background = styleColorBar(all.journey_organic$UniqueVisitors, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('TimespentPerVisit', background = styleColorBar(all.journey_organic$TimespentPerVisit, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('PageViewsPerVisit', background = styleColorBar(all.journey_organic$PageViewsPerVisit, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle(0, target='row', fontWeight = styleEqual(2, "bold"))
+```
+
+### Inorganic
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+datatable(all.journey_inorganic
+  ,  filter="top"
+) %>% formatStyle('Visits', background = styleColorBar(all.journey_inorganic$Visits, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('UniqueVisitors', background = styleColorBar(all.journey_inorganic$UniqueVisitors, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('TimespentPerVisit', background = styleColorBar(all.journey_inorganic$TimespentPerVisit, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle('PageViewsPerVisit', background = styleColorBar(all.journey_inorganic$PageViewsPerVisit, color='lightblue'),
+              backgroundSize = '95% 50%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'right'
+) %>% formatStyle(0, target='row', fontWeight = styleEqual(2, "bold"))
+```
+
+
+
+## Performance over time {.tabset}
+
+### Visit trend by country
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(MO_NUM, Country_Name) %>%
+  summarise(visits = n_distinct(VISITSOURCEID)) %>% 
+  spread(Country_Name, visits) %>%
+  plot_ly(x=~as.factor(MO_NUM), y=~`United States`, type='bar', name = 'United States') %>%
+  add_trace(y=~`Singapore`, name='Singapore')%>%
+  add_trace(y=~`United Kingdom`, name='United Kingdom')%>%
+  add_trace(y=~`Iceland`, name='Iceland')%>%
+  add_trace(y=~`Netherlands`, name='Netherlands')%>%
+  add_trace(y=~`Japan`, name='Japan')%>%
+  add_trace(y=~`Spain`, name='Spain')%>%
+  add_trace(y=~`Australia`, name='Australia')%>%
+  add_trace(y=~`Italy`, name='Italy')%>%
+  add_trace(y=~`Germany`, name='Germany')%>%
+  #add_trace(y=~`NA`, name='NA')%>%
+  add_trace(y=~`Switzerland`, name='Switzerland')%>%
+  add_trace(y=~`Luxembourg`, name='Luxembourg')%>%
+  add_trace(y=~`Austria`, name='Austria')%>%
+  add_trace(y=~`Belgium`, name='Belgium')%>%
+  add_trace(y=~`France`, name='France')%>%
+  add_trace(y=~`Hong Kong`, name='Hong Kong')%>%
+  add_trace(y=~`Portugal`, name='Portugal')%>%
+  add_trace(y=~`Ireland`, name='Ireland')%>%
+  add_trace(y=~`Sweden`, name='Sweden')%>%
+  add_trace(y=~`Denmark`, name='Denmark')%>%
+  add_trace(y=~`Norway`, name='Norway')%>%
+  add_trace(y=~`Finland`, name='Finland') %>%
+  layout(title = "ESG Global Web Visits",yaxis = list(title = 'ESG Visits'), barmode = 'stack')
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+DT::datatable(
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(MO_NUM, Country_Name) %>%
+  summarise(visits = n_distinct(VISITSOURCEID),
+            visitors = n_distinct(VISITORSOURCEID), 
+            known_visits = n_distinct(ifelse(!is.na(X18_CES_ID), VISITSOURCEID, NA)), 
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            Bounce.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/visits*100, 2), '%')
+            
+            ) %>%
+  arrange(Country_Name, desc(visits)),
+            rownames=FALSE,
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons= c('copy', 'csv', 'excel', 'pdf'))
+)
+
+# models %>%
+#   DT::datatable(
+#     rownames = FALSE,
+#     extensions = 'Buttons', 
+#     options = list(pageLength = 10, scrollX=T,
+#                    dom = 'Bfrtip', 
+#                    buttons = c('excel')))
+```
+
+### Visitor trend
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(MO_NUM, Country_Name) %>%
+  summarise(visitors = n_distinct(VISITORSOURCEID)) %>% 
+  spread(Country_Name, visitors) %>%
+  plot_ly(x=~as.factor(MO_NUM), y=~`United States`, type='bar', name = 'United States') %>%
+  add_trace(y=~`Singapore`, name='Singapore')%>%
+  add_trace(y=~`United Kingdom`, name='United Kingdom')%>%
+  add_trace(y=~`Iceland`, name='Iceland')%>%
+  add_trace(y=~`Netherlands`, name='Netherlands')%>%
+  add_trace(y=~`Japan`, name='Japan')%>%
+  add_trace(y=~`Spain`, name='Spain')%>%
+  add_trace(y=~`Australia`, name='Australia')%>%
+  add_trace(y=~`Italy`, name='Italy')%>%
+  add_trace(y=~`Germany`, name='Germany')%>%
+  #add_trace(y=~`NA`, name='NA')%>%
+  add_trace(y=~`Switzerland`, name='Switzerland')%>%
+  add_trace(y=~`Luxembourg`, name='Luxembourg')%>%
+  add_trace(y=~`Austria`, name='Austria')%>%
+  add_trace(y=~`Belgium`, name='Belgium')%>%
+  add_trace(y=~`France`, name='France')%>%
+  add_trace(y=~`Hong Kong`, name='Hong Kong')%>%
+  add_trace(y=~`Portugal`, name='Portugal')%>%
+  add_trace(y=~`Ireland`, name='Ireland')%>%
+  add_trace(y=~`Sweden`, name='Sweden')%>%
+  add_trace(y=~`Denmark`, name='Denmark')%>%
+  add_trace(y=~`Norway`, name='Norway')%>%
+  add_trace(y=~`Finland`, name='Finland') %>%
+  layout(title = "ESG Global Web unique visitors",yaxis = list(title = 'ESG Unique Visitors'), barmode = 'stack')
+```
+
+## Content usage {.tabset}
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+   mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  inner_join(taxonomy.short, c('URL.short' = 'URL.short')) %>%
+  group_by(Country_Name, Content.theme) %>%
+  summarise(visitors = n_distinct(VISITSOURCEID)) %>% 
+  spread(Content.theme, visitors) %>%
+  plot_ly(x=~as.factor(Country_Name), y=~`home`, type='bar', name = 'home') %>%
+  add_trace(y=~`approach`, name='approach')%>%
+  add_trace(y=~`approach-engagement`, name='approach-engagement')%>%
+  add_trace(y=~`approach-framework`, name='approach-framework')%>%
+  add_trace(y=~`approach-monitoring`, name='approach-monitoring')%>%
+  add_trace(y=~`engagement`, name='engagement')%>%
+  add_trace(y=~`global citizenship`, name='global citizenship')%>%
+  add_trace(y=~`global citizenship-communities`, name='global citizenship-communities')%>%
+  add_trace(y=~`healthcare`, name='healthcare')%>%
+  add_trace(y=~`home-frameworks`, name='home-frameworks')%>%
+  add_trace(y=~`materiality`, name='materiality')%>%
+  add_trace(y=~`philosophy`, name='philosophy')%>%
+  
+  layout(title = "ESG Global Web unique visitors",yaxis = list(title = 'ESG Unique Visitors'), barmode = 'stack')
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+datatable(
+clean.web %>%  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+            filter(ESG_PAGE_FLAG == "ESG Page") %>%
+            inner_join(taxonomy.short, c('URL.short' = 'URL.short')) %>%
+            group_by(Country_Name, Content.theme) %>%
+          summarise(visitors = n_distinct(VISITORSOURCEID), 
+              visits = n_distinct(VISITSOURCEID),
+              known_visits = n_distinct(ifelse(!is.na(X18_CES_ID), VISITSOURCEID, NA)), 
+              timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+              Bounce.rate = round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/visits, 2) ,
+              Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) %>%
+  arrange(Country_Name, desc(visits))
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+            
+```
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+datatable(
+clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(Country_Name, URL.short) %>%
+  summarise(visitors = n_distinct(VISITORSOURCEID), 
+    visits = n_distinct(VISITSOURCEID),
+            known_visits = n_distinct(ifelse(!is.na(X18_CES_ID), VISITSOURCEID, NA)), 
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            Bounce.rate = round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/visits, 2) ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) %>%
+  arrange(Country_Name, desc(visits))
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+datatable(video_esg
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+```
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+create_page_order <- . %>% 
+  left_join(
+    .,
+    filter(., PAGEVIEWCOUNT == 1) %>% 
+      arrange(VISITSOURCEID, HITDATETIME) %>% 
+      group_by(VISITSOURCEID) %>% 
+      mutate(page_order = row_number()) %>% 
+      ungroup() %>% 
+      select(WEBHITID, X18_CES_ID, page_order),
+    by = c("WEBHITID", "X18_CES_ID")
+  ) %>% 
+  arrange(VISITSOURCEID, WEBHITID) %>% 
+  mutate(page_order = zoo::na.locf(page_order))
+
+
+# Event function
+add_page_order_number <- function(.data) {
+  .data %>% 
+    left_join(
+      ., filter(
+        ., PAGEEVENT == 0 | !mapply(identical, PREVIOUSURL, PAGEUNIFORMRESOURCELOCATOR)) %>%
+        group_by(VISITSOURCEID) %>%
+        mutate(page_order = row_number(HITDATETIME)) %>%
+        ungroup() %>%
+        select(WEBHITID, page_order),
+      by = c("WEBHITID")
+      ) %>%
+    arrange(VISITSOURCEID, HITDATETIME) %>%
+    mutate(page_order = zoo::na.locf(page_order))
+}
+
+get_page_views <- function(.data) {
+  .data %>%
+    add_page_order_number() %>%
+    group_by(VISITSOURCEID, VISITORSOURCEID, page_order) %>%
+    mutate(
+      VIDEOCOMPLETE = coalesce(VIDEOCOMPLETE, -1),
+      VIDEO75PERCENT = coalesce(VIDEO75PERCENT, -1),
+      VIDEO50PERCENT = coalesce(VIDEO50PERCENT, -1),
+      VIDEO25PERCENT = coalesce(VIDEO25PERCENT, -1),
+      VIDEOPLAY = coalesce(VIDEOPLAY, -1)
+    ) %>% 
+    summarise(
+      WEBHITID = first(WEBHITID),
+      X18_CES_ID = first(X18_CES_ID), 
+      TrafficSourceRefined = first(TrafficSourceRefined),
+      TRAFFICSOURCE = first(TRAFFICSOURCE),
+      VISITOR_TYPE = first(VISITOR_TYPE),
+      HITDATETIME = first(HITDATETIME),
+      PREVIOUSURL = first(PREVIOUSURL),
+      PAGEUNIFORMRESOURCELOCATOR = first(PAGEUNIFORMRESOURCELOCATOR),
+      WEBSITESECTION2 = first(WEBSITESECTION2),
+      BROWSERNAME = first(BROWSERNAME),
+      scroll_percent = max(max(coalesce(OLDPERCENTVIEWED, -1)), max(coalesce(NEWPERCENTVIEWED, -1))),
+      time_on_page = sum(WEBHIT_DURATION_SS, na.rm = TRUE),
+      video_view_percent = case_when(
+        max(VIDEOCOMPLETE, na.rm = TRUE) == 1 ~ "100%",
+        max(VIDEO75PERCENT, na.rm = TRUE) == 1 ~ "75% - 99%",
+        max(VIDEO50PERCENT, na.rm = TRUE) == 1 ~ "50% - 74%",
+        max(VIDEO25PERCENT, na.rm = TRUE) == 1 ~ "25% - 49%",
+        max(VIDEOPLAY, na.rm = TRUE) == 1 ~ "0% - 24%",
+        TRUE ~ as.character(NA)
+      ),
+      video_name = first(na.omit(VIDEONAME)),
+      BOUNCED = max(BOUNCED),
+      .groups = "drop"
+    ) %>% 
+    mutate(scroll_percent = if_else(scroll_percent == -1, as.double(NA), scroll_percent))
+}
+
+
+convert_scroll_to_numeric <- . %>% mutate(
+  OLDPERCENTVIEWED = as.numeric(OLDPERCENTVIEWED),
+  NEWPERCENTVIEWED = as.numeric(NEWPERCENTVIEWED)
+)
+
+calculate_scroll_percent <- function(old_percent_col, new_percent_col) {
+  max(max(coalesce(old_percent_col, -1)), max(coalesce(new_percent_col, -1))) %>% if_else(. == -1, NA_real_, .)
+}
+
+summarise_to_pages <- . %>% 
+  group_by(VISITSOURCEID, page_order) %>% 
+  summarise(
+    scroll_percent = calculate_scroll_percent(OLDPERCENTVIEWED, NEWPERCENTVIEWED),
+    .groups = "drop"
+  )
+
+web_events <- clean.web %>% filter(ESG_PAGE_FLAG=='ESG Page') %>% convert_scroll_to_numeric() %>% create_page_order()
+web_pages <- web_events %>% summarise_to_pages()
+
+
+add_scroll_bins <- function(.data) {
+  scroll_cut_points <- c(-Inf, 0, 25, 50, 75, 100)
+  # The two dollar signs may be messing this up since $...$ matters in latex
+  scroll_bin_labels <- c(
+    "No Info",
+    "0% - 25% scrolled",
+    "26% - 50% scrolled",
+    "51% - 75% scrolled",
+    "76% - 100% scrolled"
+  )
+  .data %>% 
+    mutate(scroll_bin = cut(scroll_percent, breaks = scroll_cut_points, labels = scroll_bin_labels))
+}
+
+
+count_column_with_pct <- function(.data, summary_column, count_name = "Count", count_percent_name = "Percent") {
+  .data %>% 
+    group_by(!!ensym(summary_column)) %>%
+    summarise(
+      !!ensym(count_name) := n(),
+      .groups = "drop"
+    ) %>% 
+    mutate(
+      !!ensym(count_percent_name) := (100 * !!ensym(count_name) / sum(!!ensym(count_name))) %>% round(1) %>% paste0("%")
+    ) %>% 
+    arrange(desc(!!ensym(count_name)))
+}
+
+# doing this on a page basis
+scroll_bins <- web_pages %>% 
+  mutate(scroll_percent = coalesce(scroll_percent, 0)) %>% 
+  add_scroll_bins() %>% 
+  count_column_with_pct(scroll_bin)
+
+
+datatable(scroll_bins
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+```
+
+
+## Media Performance {.tabset}
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(Country_Name, TrafficSourceRefined) %>%
+  summarise(visits = n_distinct(VISITSOURCEID),
+            visitors = n_distinct(VISITORSOURCEID), 
+            known_visits = n_distinct(ifelse(!is.na(X18_CES_ID), VISITSOURCEID, NA)), 
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            Bounce.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/visits*100, 2), '%')  ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) %>%
+  ggplot(aes(x=Country_Name, y = visits, fill = TrafficSourceRefined)) +
+  geom_bar(stat='identity', position = 'fill') +
+  coord_flip() +
+  ggtitle('ESG Traffic mix by country')
+
+
+```
+
+### by Regions
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+datatable(
+clean.web %>%
+  mutate(URL.short = str_replace(PAGEUNIFORMRESOURCELOCATOR, 'https://www.capitalgroup.com/', '')) %>%
+  filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(Country_Name, TrafficSourceRefined) %>%
+  summarise(visits = n_distinct(VISITSOURCEID),
+            visitors = n_distinct(VISITORSOURCEID), 
+            known_visits = n_distinct(ifelse(!is.na(X18_CES_ID), VISITSOURCEID, NA)), 
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            Bounce.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/visits*100, 2), '%')  ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) %>%
+  arrange(desc(visits))
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+
+```
+
+## Visitor Analysis {.tabset}
+
+<br>
+
+Visitor Definition:  
+* <b>Known intermediaries</b> - Existing CRM (SFCD) contacts from NACG and EACG that we are able to identify on the website (cookie to PII mapping). 
+* <b>Likely intermediaries</b> - Cookies that we are able to identify organization origins through IP address mapping. For this population, we have their locations but do not have PIIs. 
+* <b>Investors</b> - Existing CG full service investors. 
+* <b>Unknown</b> - Cookies that we are currently unable to identify origins or PIIs. 
+
+<br>
+
+### Visitor composition
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+    filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  group_by(visitor.type) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  plot_ly(labels = ~visitor.type, values = ~visits, type = 'pie',
+          marker = list(
+                        colors = rainbow(10)
+          )
+          ) %>%
+  layout(title = 'ESG Visitor mix', 
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+```
+
+### Visitor composition by Country
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(Country_Name, visitor.type) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  ggplot(aes(x=Country_Name, y=visits, fill = visitor.type)) +
+  geom_bar(stat='identity', position = 'fill') +
+  coord_flip() +
+  ggtitle('Visitor composition by country')
+```
+
+
+### Visitor composition by Site
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(Country_Name, USERSERVER) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) %>%
+  ggplot(aes(x=Country_Name, y=visits, fill = USERSERVER)) +
+  geom_bar(stat='identity', position = 'fill') +
+  coord_flip() +
+  ggtitle('Visitor composition by country (sites)')
+```
+
+
+### Known organization list
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+datatable(
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name) & !is.na(agg.firm.name)) %>%
+  group_by(agg.firm.name) %>%
+    summarise(known.contacts = n_distinct(X18_CES_ID[!is.na(X18_CES_ID)]),
+            visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) %>%
+  arrange(desc(visits))  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+
+
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+datatable(
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(agg.country, agg.firm.name, visitor.type) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) 
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+
+```
+
+### Known visitor list
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+
+datatable(
+raw.web %>%
+  filter(ESG_PAGE_FLAG == "ESG Page") %>%
+  inner_join(raw.sfdc, c('X18_CES_ID' = 'x18_character_contact_id__c')) %>%
+  rename(x18_contact_id = X18_CES_ID) %>%
+  group_by(MailingCountry, MARKETING_REGION__C, NAME, parent_organization__C, x18_contact_id) %>%
+  summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%')
+            ) 
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+```
+
+```{r, include = FALSE, echo=FALSE}
+datatable(
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(Country_Name, agg.country, agg.firm.name, visitor.type) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) 
+  ,  filter="top", 
+            extensions = 'Buttons',
+            options = list(pageLength = 10, scrollX=T,
+            dom = 'Bfrtip',
+            buttons = c('copy', 'csv', 'excel', 'pdf'))
+)
+
+```
+
+## Others {.tabset}
+
+### Mobile and Desktop
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+  filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(Mobile_flag) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            )  %>%
+  plot_ly(labels = ~Mobile_flag, values = ~visits, type = 'pie',
+          marker = list(
+                        colors = rainbow(10)
+          )
+          ) %>%
+  layout(title = 'Mobile vs desktop mix', 
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)
+         )
+
+kable(
+clean.web %>%
+  filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  group_by(Mobile_flag) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%')
+            ) 
+)
+```
+
+### Operating System
+```{r, echo=FALSE}
+
+filter(clean.web, ESG_PAGE_FLAG == "ESG Page" & MO_NUM > 202010) %>% 
+  filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+   mutate(op = gsub('[[:digit:]].', '', OPERATINGSYSTEM), 
+         op2 = gsub('[[:digit:]]', '', op),
+         op3 = gsub(' .', '', op2), 
+         Operating.system = gsub('S.', 'S', op3),
+         ) %>%
+  group_by(Operating.system) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%'),
+            .groups = 'drop')  %>%
+  plot_ly(labels = ~Operating.system, values = ~visits, type = 'pie',
+          marker = list(
+                        colors = rainbow(10)
+          )
+          ) %>%
+  layout(title = 'Operating System mix', 
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)
+         )
+
+kable(
+clean.web %>%
+    filter(ESG_PAGE_FLAG == "ESG Page" & !is.na(Country_Name)) %>%
+  mutate(op = gsub('[[:digit:]].', '', OPERATINGSYSTEM), 
+         op2 = gsub('[[:digit:]]', '', op),
+         op3 = gsub(' .', '', op2), 
+         Operating.system = gsub('S.', 'S', op3),
+         ) %>%
+  group_by(Operating.system) %>%
+    summarise(visits = n_distinct(VISITSOURCEID), 
+            visitors = n_distinct(VISITORSOURCEID),
+            timeSpent.per.visit = round(sum(WEBHIT_DURATION_SS, na.rm = TRUE)/60/visits, 2), 
+            bource.rate = paste(round(n_distinct(ifelse(BOUNCED ==1, VISITSOURCEID, NA))/n_distinct(VISITSOURCEID)*100, 2),'%') ,
+            Avg.scroll.pct = paste(round(sum(OLDPERCENTVIEWED)/n_distinct(WEBHITID), 2),'%'),
+            .groups='drop') 
+)
+
+```
+
+
+## Web Journey {.tabset}
+
+### All visitors
+
+
+```{r, include=FALSE}
+con <- dbConnect(
+    odbc::odbc(),
+    driver = "ODBC Driver 13 for SQL Server", #"SQLServer13",
+    server = "tcp:lasr-sqldwdb-eastus2-prd.database.windows.net",
+    database = 'lasr-sqldwdb-prd',
+    UID=Sys.getenv("lasr_uid"),
+    PWD=Sys.getenv("lasr_cloud_pwd")
+  )
+  
+`%notin%` <- Negate(`%in%`)  
+
+ #pull in PO web data
+  raw.po <- dbGetQuery(con, 'select * from MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY 
+                        WHERE MO_NUM > 202010
+                       order by hitdatetime')
+  
+  
+  #sort and assign "Path Steps" by the hitdatetime
+po.web1 <- raw.po %>%  
+  arrange(VISITSOURCEID, HITDATETIME) %>% 
+  group_by(VISITSOURCEID) %>% 
+  mutate(PATH_STEP = rank(HITDATETIME, ties.method = 'first'))
+
+#add the next step for joins
+po.web1$NEXT_STEP = po.web1$PATH_STEP + 1
+
+
+po.web1 <- po.web1 %>%
+  left_join(select(raw.sfdc,  x18_character_contact_id__c, parent_organization__C, MailingCountry), by = c('X18_CES_ID' = 'x18_character_contact_id__c')) %>% ## join on full SFDC profiles for PII
+  left_join(country.mapping %>% mutate(CC1 = as.character(Country_code)), by=c('MailingCountry' = 'CN')) %>% ## to get country code against SFDC country field
+  left_join(country.mapping %>% mutate(CC2 = as.character(Country_code)), by=c('COUNTRY_NAME' = 'CN')) %>% ## to get country code against Server names
+  mutate(agg.firm.name = coalesce(parent_organization__C, FIRM_NAME),
+         agg.country = coalesce(CC1, CC2, COUNTRY, COUNTRY_NAME),
+         agg.firm.name.country = paste(agg.firm.name, '-', agg.country))
+
+
+raw.po <- raw.po %>% 
+    mutate(TRAFFICSOURCEREFINED = replace(TRAFFICSOURCEREFINED, TRAFFICSOURCEREFINED != "Organic Search" &  TRAFFICSOURCEREFINED != "Direct Traffic", "Email/Paid Media"))
+```
+
+
+
+
+```{r, include=FALSE}
+#select columns needed for sankey
+po.web2 <- po.web1 %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+#select columns needed for sankey
+po.web2 <- po.web1 %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+po.sankey <- po.web2 %>%
+  filter(PATH_STEP==1) %>%
+  rename(LandingPage = ESG_PAGE_FLAG) %>%
+  left_join(po.web2 %>% 
+            dplyr::rename('Event2'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP')) 
+
+#join event 2 to event 3
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event3'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y' = 'PATH_STEP')) 
+
+#join event 3 to event 4
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event4'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y' = 'PATH_STEP')) 
+
+#join event 4 to event 5
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event5'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP'))
+
+#join event 5 to event 6
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event6'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y.y' = 'PATH_STEP')) 
+
+
+##Clean sankey paths (remove unnecessary columns)
+##Also add "Exit" logic -- will be re-evaluated once production data is ready
+po.sankey <- po.sankey %>%
+      left_join(select(raw.po, VISITSOURCEID, VISITORSOURCEID, TRAFFICSOURCEREFINED), 
+                by = c('VISITSOURCEID')) %>%
+      select("TRAFFICSOURCEREFINED",'VISITSOURCEID', 'VISITORSOURCEID',
+             'LandingPage','Event2', 'Event3', 'Event4', 'Event5',
+             'Event6') %>%
+      mutate(Event2 = ifelse(is.na(Event2), 'Exited', Event2),
+             Event3 = ifelse(is.na(Event3), 'Exited', Event3),
+             Event4 = ifelse(is.na(Event4), 'Exited', Event4),
+             Event5 = ifelse(is.na(Event5), 'Exited', Event5),
+             Event6 = ifelse(is.na(Event6), 'Exited', Event6)#,
+             #Event7 = ifelse(is.na(Event7), 'Exited', Event7),
+             #Event8 = ifelse(is.na(Event8), 'Exited', Event8)
+      )
+```
+
+```{r, include=FALSE}
+#randomly assign journey step
+#LOGIC TO BE ADDED LATER ONCE PO DATA IS AVAILABLE
+#po.sankey$JOURNEY = sample(c(1,2),1985,replace = TRUE)
+
+po.sankey$JOURNEY = "Pre-Launch"
+
+#some aggregates to check pathing logic
+#There is a discrepancy in the source counts stemming from several visits
+#that were pulled in not have Entry Point Flags (thus dropping from paths)
+#This will be re-evaluated when production data is ready
+
+po.traffic.source <- raw.po %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(visits = n_distinct(VISITSOURCEID)) %>%
+  as.data.frame()
+
+po.sankey %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(value = n_distinct(VISITSOURCEID)) 
+  
+raw.po %>%
+  #filter(ENTRY_PAGE_FLAG==1) %>% 
+  group_by(TRAFFICSOURCEREFINED
+           ) %>%
+  summarise(value = n_distinct(VISITSOURCEID))
+
+po.traffic.source
+  
+```
+
+
+```{r, include=FALSE, warning=FALSE, echo=FALSE}
+
+#BUILD SANKEY CHART
+po.node1 <- data.frame(name = c(unique(po.sankey$TRAFFICSOURCEREFINED)) %>% sort(), 
+                    source.cd = 0:(length(unique(po.sankey$TRAFFICSOURCEREFINED))-1))
+
+#po.node2 <- data.frame(name = c(unique(po.sankey$PERSONA)) %>% sort(), 
+#                    persona.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$PERSONA)) + (max(po.node1$source.cd))))
+
+po.node3 <- data.frame(name = c(unique(po.sankey$LandingPage)) %>% sort(), 
+                    landing.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$LandingPage)) + (max(po.node1$source.cd))))
+
+po.node4 <- data.frame(name = c(unique(po.sankey$Event2)) %>% sort(), 
+                     nextevent2.cd = (max(po.node3$landing.cd)+1):(length(unique(po.sankey$Event2)) + max(po.node3$landing.cd)))
+                     
+po.node5 <- data.frame(name = c(unique(po.sankey$Event3)) %>% sort(), 
+                    nextevent3.cd = (max(po.node4$nextevent2.cd)+1):(length(unique(po.sankey$Event3)) + max(po.node4$nextevent2.cd)))
+
+po.node6 <- data.frame(name = c(unique(po.sankey$Event4)) %>% sort(),
+                    nextevent4.cd = (max(po.node5$nextevent3.cd)+1):(length(unique(po.sankey$Event4)) + max(po.node5$nextevent3.cd)))
+
+po.node7 <- data.frame(name = c(unique(po.sankey$Event5)) %>% sort(),
+                    nextevent5.cd = (max(po.node6$nextevent4.cd)+1):(length(unique(po.sankey$Event5)) + max(po.node6$nextevent4.cd)))
+
+po.node8 <- data.frame(name = c(unique(po.sankey$Event6)) %>% sort(),
+                    nextevent6.cd = (max(po.node7$nextevent5.cd)+1):(length(unique(po.sankey$Event6)) + max(po.node7$nextevent5.cd)))
+
+#po.node9 <- data.frame(name = c(unique(po.sankey$Event7)) %>% sort(),
+#                    nextevent7.cd = #(max(po.node8$nextevent6.cd)+1):(length(unique(po.sankey$Event7)) + #max(po.node8$nextevent6.cd)))
+
+#po.node10 <- data.frame(name = c(unique(po.sankey$Event8)) %>% sort(),
+#                    nextevent8.cd = #(max(po.node9$nextevent7.cd)+1):(length(unique(po.sankey$Event8)) + #max(po.node9$nextevent7.cd)))
+
+po.sankey.2 <- po.sankey %>%
+  left_join(po.node1, by = c("TRAFFICSOURCEREFINED" = 'name')) %>%
+  left_join(po.node3, by=c('LandingPage'='name')) %>%
+  left_join(po.node4, by=c('Event2'='name')) %>%
+  left_join(po.node5, by=c('Event3'='name')) %>%
+  left_join(po.node6, by=c('Event4'='name')) %>%
+  left_join(po.node7, by=c('Event5'='name')) %>%
+  left_join(po.node8, by=c('Event6'='name')) %>% ungroup()
+  #left_join(po.node9, by=c('Event7'='name')) %>% 
+  #left_join(po.node10, by=c('Event8'='name')) %>% ungroup()
+
+po.links <- rbind(
+  po.sankey.2 %>%
+    group_by(source.cd, landing.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+    rename(source = source.cd, 
+           target = landing.cd)
+  ,
+  
+  po.sankey.2 %>%
+    group_by(landing.cd, nextevent2.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = landing.cd, 
+         target = nextevent2.cd)
+  , 
+  po.sankey.2 %>%
+    group_by(nextevent2.cd, nextevent3.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent2.cd, 
+         target = nextevent3.cd)
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent3.cd, nextevent4.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent3.cd, 
+         target = nextevent4.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent4.cd, nextevent5.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent4.cd, 
+         target = nextevent5.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent5.cd, nextevent6.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent5.cd, 
+         target = nextevent6.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent6.cd, nextevent7.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent6.cd, 
+  #       target = nextevent7.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent7.cd, nextevent8.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent7.cd, 
+  #       target = nextevent8.cd)
+  ) %>%
+  filter(!is.na(target)) %>%
+  arrange(source) #%>%
+#  filter(value > 1)
+  
+#links  
+
+po.notes <-
+  rbind(
+    po.sankey.2 %>%
+      select(TRAFFICSOURCEREFINED, source.cd) %>%
+      distinct() %>%
+      dplyr::rename(name = TRAFFICSOURCEREFINED, 
+                    cd = source.cd)
+    ,
+  
+    po.sankey.2 %>%
+      select(LandingPage, landing.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = LandingPage, 
+             cd = landing.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>%
+      select(Event2, nextevent2.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event2, 
+             cd = nextevent2.cd) %>%
+      arrange(as.integer(cd)) 
+      , 
+    po.sankey.2 %>% filter(!is.na(Event3)) %>%
+      select(Event3, nextevent3.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event3, 
+             cd = nextevent3.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event4)) %>%
+      select(Event4, nextevent4.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event4, 
+             cd = nextevent4.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event5)) %>%
+      select(Event5, nextevent5.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event5, 
+             cd = nextevent5.cd) %>%
+      arrange(as.integer(cd)) 
+    
+    ,
+    po.sankey.2 %>% filter(!is.na(Event6)) %>%
+      select(Event6, nextevent6.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event6, 
+             cd = nextevent6.cd) %>%
+      arrange(as.integer(cd))
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event7)) %>%
+    #  select(Event7, nextevent7.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event7, 
+    #         cd = nextevent7.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event8)) %>%
+    #  select(Event8, nextevent8.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event8, 
+    #         cd = nextevent8.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    )%>%
+  arrange(as.integer(cd))
+
+po.name <- po.notes %>%
+  group_by(name) %>%
+  tally() %>%
+  select(name)
+
+po.sankey.colors <- as.data.frame(po.name) %>%
+  mutate(color = substr(ifelse(name=='Exited', 'white', viridis(n_distinct(po.notes$name))), 1, 7)
+  )
+
+
+po.notes <- po.notes %>% 
+  left_join(po.sankey.colors, by=c('name'))
+
+po.sankey.plot <- plot_ly(
+    type = "sankey",
+    domain = list(x =  c(0,1), y =  c(0,1)),
+    orientation = "l",
+    valueformat = ".0f",
+    valuesuffix = " visits",
+    textfont = list(size = 6),
+    node = list(
+      label = po.notes$name,
+      color = po.notes$color,
+      pad = 20,
+      line = list(
+        color = "black",
+        width = 0.9
+         )
+       ),
+
+    link = list(
+      source = po.links$source,
+      target = po.links$target,
+      value =  po.links$value
+    )
+  ) %>% 
+  
+  layout(
+    title = "ESG Web Journey",
+    font = list(size = 10),
+    xaxis = list(showgrid = F, zeroline = F),
+    yaxis = list(showgrid = F, zeroline = F)
+)
+```
+
+```{r, echo=FALSE}
+po.sankey.plot
+```
+
+### United States
+
+```{r, include =FALSE}
+po.us <- filter(po.web1, COUNTRY_NAME=='United States')
+```
+
+```{r, include=FALSE}
+#select columns needed for sankey
+po.web2 <- po.us %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+#select columns needed for sankey
+po.web2 <- po.us %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+po.sankey <- po.web2 %>%
+  filter(PATH_STEP==1) %>%
+  rename(LandingPage = ESG_PAGE_FLAG) %>%
+  left_join(po.web2 %>% 
+            dplyr::rename('Event2'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP')) 
+
+#join event 2 to event 3
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event3'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y' = 'PATH_STEP')) 
+
+#join event 3 to event 4
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event4'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y' = 'PATH_STEP')) 
+
+#join event 4 to event 5
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event5'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP'))
+
+#join event 5 to event 6
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event6'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y.y' = 'PATH_STEP')) 
+
+
+##Clean sankey paths (remove unnecessary columns)
+##Also add "Exit" logic -- will be re-evaluated once production data is ready
+po.sankey <- po.sankey %>%
+      left_join(select(raw.po, VISITSOURCEID, VISITORSOURCEID, TRAFFICSOURCEREFINED), 
+                by = c('VISITSOURCEID')) %>%
+      select("TRAFFICSOURCEREFINED",'VISITSOURCEID', 'VISITORSOURCEID',
+             'LandingPage','Event2', 'Event3', 'Event4', 'Event5',
+             'Event6') %>%
+      mutate(Event2 = ifelse(is.na(Event2), 'Exited', Event2),
+             Event3 = ifelse(is.na(Event3), 'Exited', Event3),
+             Event4 = ifelse(is.na(Event4), 'Exited', Event4),
+             Event5 = ifelse(is.na(Event5), 'Exited', Event5),
+             Event6 = ifelse(is.na(Event6), 'Exited', Event6)#,
+             #Event7 = ifelse(is.na(Event7), 'Exited', Event7),
+             #Event8 = ifelse(is.na(Event8), 'Exited', Event8)
+      )
+```
+
+```{r, include=FALSE}
+#randomly assign journey step
+#LOGIC TO BE ADDED LATER ONCE PO DATA IS AVAILABLE
+#po.sankey$JOURNEY = sample(c(1,2),1985,replace = TRUE)
+
+po.sankey$JOURNEY = "Pre-Launch"
+
+#some aggregates to check pathing logic
+#There is a discrepancy in the source counts stemming from several visits
+#that were pulled in not have Entry Point Flags (thus dropping from paths)
+#This will be re-evaluated when production data is ready
+
+po.traffic.source <- raw.po %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(visits = n_distinct(VISITSOURCEID)) %>%
+  as.data.frame()
+
+po.sankey %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(value = n_distinct(VISITSOURCEID)) 
+  
+raw.po %>%
+  #filter(ENTRY_PAGE_FLAG==1) %>% 
+  group_by(TRAFFICSOURCEREFINED
+           ) %>%
+  summarise(value = n_distinct(VISITSOURCEID))
+
+po.traffic.source
+  
+```
+
+
+```{r, include=FALSE, warning=FALSE, echo=FALSE}
+
+#BUILD SANKEY CHART
+po.node1 <- data.frame(name = c(unique(po.sankey$TRAFFICSOURCEREFINED)) %>% sort(), 
+                    source.cd = 0:(length(unique(po.sankey$TRAFFICSOURCEREFINED))-1))
+
+#po.node2 <- data.frame(name = c(unique(po.sankey$PERSONA)) %>% sort(), 
+#                    persona.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$PERSONA)) + (max(po.node1$source.cd))))
+
+po.node3 <- data.frame(name = c(unique(po.sankey$LandingPage)) %>% sort(), 
+                    landing.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$LandingPage)) + (max(po.node1$source.cd))))
+
+po.node4 <- data.frame(name = c(unique(po.sankey$Event2)) %>% sort(), 
+                     nextevent2.cd = (max(po.node3$landing.cd)+1):(length(unique(po.sankey$Event2)) + max(po.node3$landing.cd)))
+                     
+po.node5 <- data.frame(name = c(unique(po.sankey$Event3)) %>% sort(), 
+                    nextevent3.cd = (max(po.node4$nextevent2.cd)+1):(length(unique(po.sankey$Event3)) + max(po.node4$nextevent2.cd)))
+
+po.node6 <- data.frame(name = c(unique(po.sankey$Event4)) %>% sort(),
+                    nextevent4.cd = (max(po.node5$nextevent3.cd)+1):(length(unique(po.sankey$Event4)) + max(po.node5$nextevent3.cd)))
+
+po.node7 <- data.frame(name = c(unique(po.sankey$Event5)) %>% sort(),
+                    nextevent5.cd = (max(po.node6$nextevent4.cd)+1):(length(unique(po.sankey$Event5)) + max(po.node6$nextevent4.cd)))
+
+po.node8 <- data.frame(name = c(unique(po.sankey$Event6)) %>% sort(),
+                    nextevent6.cd = (max(po.node7$nextevent5.cd)+1):(length(unique(po.sankey$Event6)) + max(po.node7$nextevent5.cd)))
+
+#po.node9 <- data.frame(name = c(unique(po.sankey$Event7)) %>% sort(),
+#                    nextevent7.cd = #(max(po.node8$nextevent6.cd)+1):(length(unique(po.sankey$Event7)) + #max(po.node8$nextevent6.cd)))
+
+#po.node10 <- data.frame(name = c(unique(po.sankey$Event8)) %>% sort(),
+#                    nextevent8.cd = #(max(po.node9$nextevent7.cd)+1):(length(unique(po.sankey$Event8)) + #max(po.node9$nextevent7.cd)))
+
+po.sankey.2 <- po.sankey %>%
+  left_join(po.node1, by = c("TRAFFICSOURCEREFINED" = 'name')) %>%
+  left_join(po.node3, by=c('LandingPage'='name')) %>%
+  left_join(po.node4, by=c('Event2'='name')) %>%
+  left_join(po.node5, by=c('Event3'='name')) %>%
+  left_join(po.node6, by=c('Event4'='name')) %>%
+  left_join(po.node7, by=c('Event5'='name')) %>%
+  left_join(po.node8, by=c('Event6'='name')) %>% ungroup()
+  #left_join(po.node9, by=c('Event7'='name')) %>% 
+  #left_join(po.node10, by=c('Event8'='name')) %>% ungroup()
+
+po.links <- rbind(
+  po.sankey.2 %>%
+    group_by(source.cd, landing.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+    rename(source = source.cd, 
+           target = landing.cd)
+  ,
+  
+  po.sankey.2 %>%
+    group_by(landing.cd, nextevent2.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = landing.cd, 
+         target = nextevent2.cd)
+  , 
+  po.sankey.2 %>%
+    group_by(nextevent2.cd, nextevent3.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent2.cd, 
+         target = nextevent3.cd)
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent3.cd, nextevent4.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent3.cd, 
+         target = nextevent4.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent4.cd, nextevent5.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent4.cd, 
+         target = nextevent5.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent5.cd, nextevent6.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent5.cd, 
+         target = nextevent6.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent6.cd, nextevent7.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent6.cd, 
+  #       target = nextevent7.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent7.cd, nextevent8.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent7.cd, 
+  #       target = nextevent8.cd)
+  ) %>%
+  filter(!is.na(target)) %>%
+  arrange(source) #%>%
+#  filter(value > 1)
+  
+#links  
+
+po.notes <-
+  rbind(
+    po.sankey.2 %>%
+      select(TRAFFICSOURCEREFINED, source.cd) %>%
+      distinct() %>%
+      dplyr::rename(name = TRAFFICSOURCEREFINED, 
+                    cd = source.cd)
+    ,
+  
+    po.sankey.2 %>%
+      select(LandingPage, landing.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = LandingPage, 
+             cd = landing.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>%
+      select(Event2, nextevent2.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event2, 
+             cd = nextevent2.cd) %>%
+      arrange(as.integer(cd)) 
+      , 
+    po.sankey.2 %>% filter(!is.na(Event3)) %>%
+      select(Event3, nextevent3.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event3, 
+             cd = nextevent3.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event4)) %>%
+      select(Event4, nextevent4.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event4, 
+             cd = nextevent4.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event5)) %>%
+      select(Event5, nextevent5.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event5, 
+             cd = nextevent5.cd) %>%
+      arrange(as.integer(cd)) 
+    
+    ,
+    po.sankey.2 %>% filter(!is.na(Event6)) %>%
+      select(Event6, nextevent6.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event6, 
+             cd = nextevent6.cd) %>%
+      arrange(as.integer(cd))
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event7)) %>%
+    #  select(Event7, nextevent7.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event7, 
+    #         cd = nextevent7.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event8)) %>%
+    #  select(Event8, nextevent8.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event8, 
+    #         cd = nextevent8.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    )%>%
+  arrange(as.integer(cd))
+
+po.name <- po.notes %>%
+  group_by(name) %>%
+  tally() %>%
+  select(name)
+
+po.sankey.colors <- as.data.frame(po.name) %>%
+  mutate(color = substr(ifelse(name=='Exited', 'white', viridis(n_distinct(po.notes$name))), 1, 7)
+  )
+
+
+po.notes <- po.notes %>% 
+  left_join(po.sankey.colors, by=c('name'))
+
+po.sankey.plot <- plot_ly(
+    type = "sankey",
+    domain = list(x =  c(0,1), y =  c(0,1)),
+    orientation = "l",
+    valueformat = ".0f",
+    valuesuffix = " visits",
+    textfont = list(size = 6),
+    node = list(
+      label = po.notes$name,
+      color = po.notes$color,
+      pad = 20,
+      line = list(
+        color = "black",
+        width = 0.9
+         )
+       ),
+
+    link = list(
+      source = po.links$source,
+      target = po.links$target,
+      value =  po.links$value
+    )
+  ) %>% 
+  
+  layout(
+    title = "ESG Web Journey",
+    font = list(size = 10),
+    xaxis = list(showgrid = F, zeroline = F),
+    yaxis = list(showgrid = F, zeroline = F)
+)
+```
+
+```{r, echo=FALSE}
+po.sankey.plot
+```
+
+
+
+
+
+
+
+
+
+### United Kingdom
+
+```{r, include=FALSE}
+po.uk <- filter(po.web1, COUNTRY_NAME=='United Kingdom')
+```
+
+```{r, include=FALSE}
+#select columns needed for sankey
+po.web2 <- po.uk %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+#select columns needed for sankey
+po.web2 <- po.uk %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+po.sankey <- po.web2 %>%
+  filter(PATH_STEP==1) %>%
+  rename(LandingPage = ESG_PAGE_FLAG) %>%
+  left_join(po.web2 %>% 
+            dplyr::rename('Event2'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP')) 
+
+#join event 2 to event 3
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event3'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y' = 'PATH_STEP')) 
+
+#join event 3 to event 4
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event4'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y' = 'PATH_STEP')) 
+
+#join event 4 to event 5
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event5'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP'))
+
+#join event 5 to event 6
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event6'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y.y' = 'PATH_STEP')) 
+
+
+##Clean sankey paths (remove unnecessary columns)
+##Also add "Exit" logic -- will be re-evaluated once production data is ready
+po.sankey <- po.sankey %>%
+      left_join(select(raw.po, VISITSOURCEID, VISITORSOURCEID, TRAFFICSOURCEREFINED), 
+                by = c('VISITSOURCEID')) %>%
+      select("TRAFFICSOURCEREFINED",'VISITSOURCEID', 'VISITORSOURCEID',
+             'LandingPage','Event2', 'Event3', 'Event4', 'Event5',
+             'Event6') %>%
+      mutate(Event2 = ifelse(is.na(Event2), 'Exited', Event2),
+             Event3 = ifelse(is.na(Event3), 'Exited', Event3),
+             Event4 = ifelse(is.na(Event4), 'Exited', Event4),
+             Event5 = ifelse(is.na(Event5), 'Exited', Event5),
+             Event6 = ifelse(is.na(Event6), 'Exited', Event6)#,
+             #Event7 = ifelse(is.na(Event7), 'Exited', Event7),
+             #Event8 = ifelse(is.na(Event8), 'Exited', Event8)
+      )
+```
+
+```{r, include=FALSE}
+#randomly assign journey step
+#LOGIC TO BE ADDED LATER ONCE PO DATA IS AVAILABLE
+#po.sankey$JOURNEY = sample(c(1,2),1985,replace = TRUE)
+
+po.sankey$JOURNEY = "Pre-Launch"
+
+#some aggregates to check pathing logic
+#There is a discrepancy in the source counts stemming from several visits
+#that were pulled in not have Entry Point Flags (thus dropping from paths)
+#This will be re-evaluated when production data is ready
+
+po.traffic.source <- raw.po %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(visits = n_distinct(VISITSOURCEID)) %>%
+  as.data.frame()
+
+po.sankey %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(value = n_distinct(VISITSOURCEID)) 
+  
+raw.po %>%
+  #filter(ENTRY_PAGE_FLAG==1) %>% 
+  group_by(TRAFFICSOURCEREFINED
+           ) %>%
+  summarise(value = n_distinct(VISITSOURCEID))
+
+po.traffic.source
+  
+```
+
+
+```{r, include=FALSE, warning=FALSE, echo=FALSE}
+
+#BUILD SANKEY CHART
+po.node1 <- data.frame(name = c(unique(po.sankey$TRAFFICSOURCEREFINED)) %>% sort(), 
+                    source.cd = 0:(length(unique(po.sankey$TRAFFICSOURCEREFINED))-1))
+
+#po.node2 <- data.frame(name = c(unique(po.sankey$PERSONA)) %>% sort(), 
+#                    persona.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$PERSONA)) + (max(po.node1$source.cd))))
+
+po.node3 <- data.frame(name = c(unique(po.sankey$LandingPage)) %>% sort(), 
+                    landing.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$LandingPage)) + (max(po.node1$source.cd))))
+
+po.node4 <- data.frame(name = c(unique(po.sankey$Event2)) %>% sort(), 
+                     nextevent2.cd = (max(po.node3$landing.cd)+1):(length(unique(po.sankey$Event2)) + max(po.node3$landing.cd)))
+                     
+po.node5 <- data.frame(name = c(unique(po.sankey$Event3)) %>% sort(), 
+                    nextevent3.cd = (max(po.node4$nextevent2.cd)+1):(length(unique(po.sankey$Event3)) + max(po.node4$nextevent2.cd)))
+
+po.node6 <- data.frame(name = c(unique(po.sankey$Event4)) %>% sort(),
+                    nextevent4.cd = (max(po.node5$nextevent3.cd)+1):(length(unique(po.sankey$Event4)) + max(po.node5$nextevent3.cd)))
+
+po.node7 <- data.frame(name = c(unique(po.sankey$Event5)) %>% sort(),
+                    nextevent5.cd = (max(po.node6$nextevent4.cd)+1):(length(unique(po.sankey$Event5)) + max(po.node6$nextevent4.cd)))
+
+po.node8 <- data.frame(name = c(unique(po.sankey$Event6)) %>% sort(),
+                    nextevent6.cd = (max(po.node7$nextevent5.cd)+1):(length(unique(po.sankey$Event6)) + max(po.node7$nextevent5.cd)))
+
+#po.node9 <- data.frame(name = c(unique(po.sankey$Event7)) %>% sort(),
+#                    nextevent7.cd = #(max(po.node8$nextevent6.cd)+1):(length(unique(po.sankey$Event7)) + #max(po.node8$nextevent6.cd)))
+
+#po.node10 <- data.frame(name = c(unique(po.sankey$Event8)) %>% sort(),
+#                    nextevent8.cd = #(max(po.node9$nextevent7.cd)+1):(length(unique(po.sankey$Event8)) + #max(po.node9$nextevent7.cd)))
+
+po.sankey.2 <- po.sankey %>%
+  left_join(po.node1, by = c("TRAFFICSOURCEREFINED" = 'name')) %>%
+  left_join(po.node3, by=c('LandingPage'='name')) %>%
+  left_join(po.node4, by=c('Event2'='name')) %>%
+  left_join(po.node5, by=c('Event3'='name')) %>%
+  left_join(po.node6, by=c('Event4'='name')) %>%
+  left_join(po.node7, by=c('Event5'='name')) %>%
+  left_join(po.node8, by=c('Event6'='name')) %>% ungroup()
+  #left_join(po.node9, by=c('Event7'='name')) %>% 
+  #left_join(po.node10, by=c('Event8'='name')) %>% ungroup()
+
+po.links <- rbind(
+  po.sankey.2 %>%
+    group_by(source.cd, landing.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+    rename(source = source.cd, 
+           target = landing.cd)
+  ,
+  
+  po.sankey.2 %>%
+    group_by(landing.cd, nextevent2.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = landing.cd, 
+         target = nextevent2.cd)
+  , 
+  po.sankey.2 %>%
+    group_by(nextevent2.cd, nextevent3.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent2.cd, 
+         target = nextevent3.cd)
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent3.cd, nextevent4.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent3.cd, 
+         target = nextevent4.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent4.cd, nextevent5.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent4.cd, 
+         target = nextevent5.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent5.cd, nextevent6.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent5.cd, 
+         target = nextevent6.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent6.cd, nextevent7.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent6.cd, 
+  #       target = nextevent7.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent7.cd, nextevent8.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent7.cd, 
+  #       target = nextevent8.cd)
+  ) %>%
+  filter(!is.na(target)) %>%
+  arrange(source) #%>%
+#  filter(value > 1)
+  
+#links  
+
+po.notes <-
+  rbind(
+    po.sankey.2 %>%
+      select(TRAFFICSOURCEREFINED, source.cd) %>%
+      distinct() %>%
+      dplyr::rename(name = TRAFFICSOURCEREFINED, 
+                    cd = source.cd)
+    ,
+  
+    po.sankey.2 %>%
+      select(LandingPage, landing.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = LandingPage, 
+             cd = landing.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>%
+      select(Event2, nextevent2.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event2, 
+             cd = nextevent2.cd) %>%
+      arrange(as.integer(cd)) 
+      , 
+    po.sankey.2 %>% filter(!is.na(Event3)) %>%
+      select(Event3, nextevent3.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event3, 
+             cd = nextevent3.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event4)) %>%
+      select(Event4, nextevent4.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event4, 
+             cd = nextevent4.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event5)) %>%
+      select(Event5, nextevent5.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event5, 
+             cd = nextevent5.cd) %>%
+      arrange(as.integer(cd)) 
+    
+    ,
+    po.sankey.2 %>% filter(!is.na(Event6)) %>%
+      select(Event6, nextevent6.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event6, 
+             cd = nextevent6.cd) %>%
+      arrange(as.integer(cd))
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event7)) %>%
+    #  select(Event7, nextevent7.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event7, 
+    #         cd = nextevent7.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event8)) %>%
+    #  select(Event8, nextevent8.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event8, 
+    #         cd = nextevent8.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    )%>%
+  arrange(as.integer(cd))
+
+po.name <- po.notes %>%
+  group_by(name) %>%
+  tally() %>%
+  select(name)
+
+po.sankey.colors <- as.data.frame(po.name) %>%
+  mutate(color = substr(ifelse(name=='Exited', 'white', viridis(n_distinct(po.notes$name))), 1, 7)
+  )
+
+
+po.notes <- po.notes %>% 
+  left_join(po.sankey.colors, by=c('name'))
+
+po.sankey.plot <- plot_ly(
+    type = "sankey",
+    domain = list(x =  c(0,1), y =  c(0,1)),
+    orientation = "l",
+    valueformat = ".0f",
+    valuesuffix = " visits",
+    textfont = list(size = 6),
+    node = list(
+      label = po.notes$name,
+      color = po.notes$color,
+      pad = 20,
+      line = list(
+        color = "black",
+        width = 0.9
+         )
+       ),
+
+    link = list(
+      source = po.links$source,
+      target = po.links$target,
+      value =  po.links$value
+    )
+  ) %>% 
+  
+  layout(
+    title = "ESG Web Journey",
+    font = list(size = 10),
+    xaxis = list(showgrid = F, zeroline = F),
+    yaxis = list(showgrid = F, zeroline = F)
+)
+```
+
+```{r, echo=FALSE}
+po.sankey.plot
+```
+
+### Singapore
+
+```{r, include=FALSE}
+po.sing <- filter(po.web1, COUNTRY_NAME=='Singapore')
+```
+
+```{r, include=FALSE}
+#select columns needed for sankey
+po.web2 <- po.sing %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+#select columns needed for sankey
+po.web2 <- po.sing %>%
+  select("VISITSOURCEID", "ENTRY_PAGE_FLAG", "URL",
+         "PREVIOUSURL", "ESG_PAGE_FLAG","HITDATETIME",
+         "PATH_STEP", "NEXT_STEP")
+
+#identify landing page and join to event 2
+po.sankey <- po.web2 %>%
+  filter(PATH_STEP==1) %>%
+  rename(LandingPage = ESG_PAGE_FLAG) %>%
+  left_join(po.web2 %>% 
+            dplyr::rename('Event2'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP')) 
+
+#join event 2 to event 3
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event3'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y' = 'PATH_STEP')) 
+
+#join event 3 to event 4
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event4'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y' = 'PATH_STEP')) 
+
+#join event 4 to event 5
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event5'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP' = 'PATH_STEP'))
+
+#join event 5 to event 6
+po.sankey <- po.sankey %>% left_join(po.web2 %>% 
+            dplyr::rename('Event6'='ESG_PAGE_FLAG'), 
+            by=c('VISITSOURCEID', 'NEXT_STEP.y.y.y' = 'PATH_STEP')) 
+
+
+##Clean sankey paths (remove unnecessary columns)
+##Also add "Exit" logic -- will be re-evaluated once production data is ready
+po.sankey <- po.sankey %>%
+      left_join(select(raw.po, VISITSOURCEID, VISITORSOURCEID, TRAFFICSOURCEREFINED), 
+                by = c('VISITSOURCEID')) %>%
+      select("TRAFFICSOURCEREFINED",'VISITSOURCEID', 'VISITORSOURCEID',
+             'LandingPage','Event2', 'Event3', 'Event4', 'Event5',
+             'Event6') %>%
+      mutate(Event2 = ifelse(is.na(Event2), 'Exited', Event2),
+             Event3 = ifelse(is.na(Event3), 'Exited', Event3),
+             Event4 = ifelse(is.na(Event4), 'Exited', Event4),
+             Event5 = ifelse(is.na(Event5), 'Exited', Event5),
+             Event6 = ifelse(is.na(Event6), 'Exited', Event6)#,
+             #Event7 = ifelse(is.na(Event7), 'Exited', Event7),
+             #Event8 = ifelse(is.na(Event8), 'Exited', Event8)
+      )
+```
+
+```{r, include=FALSE}
+#randomly assign journey step
+#LOGIC TO BE ADDED LATER ONCE PO DATA IS AVAILABLE
+#po.sankey$JOURNEY = sample(c(1,2),1985,replace = TRUE)
+
+po.sankey$JOURNEY = "Pre-Launch"
+
+#some aggregates to check pathing logic
+#There is a discrepancy in the source counts stemming from several visits
+#that were pulled in not have Entry Point Flags (thus dropping from paths)
+#This will be re-evaluated when production data is ready
+
+po.traffic.source <- raw.po %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(visits = n_distinct(VISITSOURCEID)) %>%
+  as.data.frame()
+
+po.sankey %>%
+  group_by(TRAFFICSOURCEREFINED) %>%
+  summarise(value = n_distinct(VISITSOURCEID)) 
+  
+raw.po %>%
+  #filter(ENTRY_PAGE_FLAG==1) %>% 
+  group_by(TRAFFICSOURCEREFINED
+           ) %>%
+  summarise(value = n_distinct(VISITSOURCEID))
+
+po.traffic.source
+  
+```
+
+
+```{r, include=FALSE, warning=FALSE, echo=FALSE}
+
+#BUILD SANKEY CHART
+po.node1 <- data.frame(name = c(unique(po.sankey$TRAFFICSOURCEREFINED)) %>% sort(), 
+                    source.cd = 0:(length(unique(po.sankey$TRAFFICSOURCEREFINED))-1))
+
+#po.node2 <- data.frame(name = c(unique(po.sankey$PERSONA)) %>% sort(), 
+#                    persona.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$PERSONA)) + (max(po.node1$source.cd))))
+
+po.node3 <- data.frame(name = c(unique(po.sankey$LandingPage)) %>% sort(), 
+                    landing.cd = (max(po.node1$source.cd)+1):(length(unique(po.sankey$LandingPage)) + (max(po.node1$source.cd))))
+
+po.node4 <- data.frame(name = c(unique(po.sankey$Event2)) %>% sort(), 
+                     nextevent2.cd = (max(po.node3$landing.cd)+1):(length(unique(po.sankey$Event2)) + max(po.node3$landing.cd)))
+                     
+po.node5 <- data.frame(name = c(unique(po.sankey$Event3)) %>% sort(), 
+                    nextevent3.cd = (max(po.node4$nextevent2.cd)+1):(length(unique(po.sankey$Event3)) + max(po.node4$nextevent2.cd)))
+
+po.node6 <- data.frame(name = c(unique(po.sankey$Event4)) %>% sort(),
+                    nextevent4.cd = (max(po.node5$nextevent3.cd)+1):(length(unique(po.sankey$Event4)) + max(po.node5$nextevent3.cd)))
+
+po.node7 <- data.frame(name = c(unique(po.sankey$Event5)) %>% sort(),
+                    nextevent5.cd = (max(po.node6$nextevent4.cd)+1):(length(unique(po.sankey$Event5)) + max(po.node6$nextevent4.cd)))
+
+po.node8 <- data.frame(name = c(unique(po.sankey$Event6)) %>% sort(),
+                    nextevent6.cd = (max(po.node7$nextevent5.cd)+1):(length(unique(po.sankey$Event6)) + max(po.node7$nextevent5.cd)))
+
+#po.node9 <- data.frame(name = c(unique(po.sankey$Event7)) %>% sort(),
+#                    nextevent7.cd = #(max(po.node8$nextevent6.cd)+1):(length(unique(po.sankey$Event7)) + #max(po.node8$nextevent6.cd)))
+
+#po.node10 <- data.frame(name = c(unique(po.sankey$Event8)) %>% sort(),
+#                    nextevent8.cd = #(max(po.node9$nextevent7.cd)+1):(length(unique(po.sankey$Event8)) + #max(po.node9$nextevent7.cd)))
+
+po.sankey.2 <- po.sankey %>%
+  left_join(po.node1, by = c("TRAFFICSOURCEREFINED" = 'name')) %>%
+  left_join(po.node3, by=c('LandingPage'='name')) %>%
+  left_join(po.node4, by=c('Event2'='name')) %>%
+  left_join(po.node5, by=c('Event3'='name')) %>%
+  left_join(po.node6, by=c('Event4'='name')) %>%
+  left_join(po.node7, by=c('Event5'='name')) %>%
+  left_join(po.node8, by=c('Event6'='name')) %>% ungroup()
+  #left_join(po.node9, by=c('Event7'='name')) %>% 
+  #left_join(po.node10, by=c('Event8'='name')) %>% ungroup()
+
+po.links <- rbind(
+  po.sankey.2 %>%
+    group_by(source.cd, landing.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+    rename(source = source.cd, 
+           target = landing.cd)
+  ,
+  
+  po.sankey.2 %>%
+    group_by(landing.cd, nextevent2.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = landing.cd, 
+         target = nextevent2.cd)
+  , 
+  po.sankey.2 %>%
+    group_by(nextevent2.cd, nextevent3.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent2.cd, 
+         target = nextevent3.cd)
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent3.cd, nextevent4.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent3.cd, 
+         target = nextevent4.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent4.cd, nextevent5.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent4.cd, 
+         target = nextevent5.cd)
+  
+  ,
+  po.sankey.2 %>%
+    group_by(nextevent5.cd, nextevent6.cd) %>%
+    summarise(value = n_distinct(VISITSOURCEID)) %>%
+     dplyr::rename(source = nextevent5.cd, 
+         target = nextevent6.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent6.cd, nextevent7.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent6.cd, 
+  #       target = nextevent7.cd)
+  
+  #,
+  #po.sankey.2 %>%
+  #  group_by(nextevent7.cd, nextevent8.cd) %>%
+  #  summarise(value = n_distinct(VISITSOURCEID)) %>%
+  #   dplyr::rename(source = nextevent7.cd, 
+  #       target = nextevent8.cd)
+  ) %>%
+  filter(!is.na(target)) %>%
+  arrange(source) #%>%
+#  filter(value > 1)
+  
+#links  
+
+po.notes <-
+  rbind(
+    po.sankey.2 %>%
+      select(TRAFFICSOURCEREFINED, source.cd) %>%
+      distinct() %>%
+      dplyr::rename(name = TRAFFICSOURCEREFINED, 
+                    cd = source.cd)
+    ,
+  
+    po.sankey.2 %>%
+      select(LandingPage, landing.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = LandingPage, 
+             cd = landing.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>%
+      select(Event2, nextevent2.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event2, 
+             cd = nextevent2.cd) %>%
+      arrange(as.integer(cd)) 
+      , 
+    po.sankey.2 %>% filter(!is.na(Event3)) %>%
+      select(Event3, nextevent3.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event3, 
+             cd = nextevent3.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event4)) %>%
+      select(Event4, nextevent4.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event4, 
+             cd = nextevent4.cd) %>%
+      arrange(as.integer(cd)) 
+    ,
+    po.sankey.2 %>% filter(!is.na(Event5)) %>%
+      select(Event5, nextevent5.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event5, 
+             cd = nextevent5.cd) %>%
+      arrange(as.integer(cd)) 
+    
+    ,
+    po.sankey.2 %>% filter(!is.na(Event6)) %>%
+      select(Event6, nextevent6.cd) %>%
+      distinct() %>%
+     dplyr::rename(name = Event6, 
+             cd = nextevent6.cd) %>%
+      arrange(as.integer(cd))
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event7)) %>%
+    #  select(Event7, nextevent7.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event7, 
+    #         cd = nextevent7.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    #,
+    #po.sankey.2 %>% filter(!is.na(Event8)) %>%
+    #  select(Event8, nextevent8.cd) %>%
+    #  distinct() %>%
+    # dplyr::rename(name = Event8, 
+    #         cd = nextevent8.cd) %>%
+    #  arrange(as.integer(cd)) 
+    
+    )%>%
+  arrange(as.integer(cd))
+
+po.name <- po.notes %>%
+  group_by(name) %>%
+  tally() %>%
+  select(name)
+
+po.sankey.colors <- as.data.frame(po.name) %>%
+  mutate(color = substr(ifelse(name=='Exited', 'white', viridis(n_distinct(po.notes$name))), 1, 7)
+  )
+
+
+po.notes <- po.notes %>% 
+  left_join(po.sankey.colors, by=c('name'))
+
+po.sankey.plot <- plot_ly(
+    type = "sankey",
+    domain = list(x =  c(0,1), y =  c(0,1)),
+    orientation = "l",
+    valueformat = ".0f",
+    valuesuffix = " visits",
+    textfont = list(size = 6),
+    node = list(
+      label = po.notes$name,
+      color = po.notes$color,
+      pad = 20,
+      line = list(
+        color = "black",
+        width = 0.9
+         )
+       ),
+
+    link = list(
+      source = po.links$source,
+      target = po.links$target,
+      value =  po.links$value
+    )
+  ) %>% 
+  
+  layout(
+    title = "ESG Web Journey",
+    font = list(size = 10),
+    xaxis = list(showgrid = F, zeroline = F),
+    yaxis = list(showgrid = F, zeroline = F)
+)
+```
+
+```{r, echo=FALSE}
+po.sankey.plot
+```
+
+```{sql connection=con, output.var='leave_uk_pages', include=FALSE} 
+SELECT 
+a.URL_SHORT
+, a.Country_Name
+, COUNT(*) Hits
+FROM (SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) a
+LEFT JOIN (SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) b
+ON a.VisitSourceId = b.VisitSourceId AND a.PageVisitRank = b.PageVisitRank + 1
+WHERE 1=1
+AND b.VISITSOURCEID IN (SELECT DISTINCT VISITSOURCEID FROM (SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) z WHERE z.UK_Start = 1)
+AND a.COUNTRY_NAME <> 'United Kingdom' 
+AND b.COUNTRY_NAME = 'United Kingdom'
+GROUP BY a.URL_SHORT, a.Country_Name
+ORDER BY COUNT(*) DESC
+```
+
+```{sql connection=con, output.var='total_uk_visits', include=FALSE}
+SELECT
+COUNT(DISTINCT a.VISITSOURCEID)
+FROM 
+(SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) a
+WHERE UK_Start = 1
+```
+
+
+```{sql connection=con, output.var='pct_leaving', include=FALSE}
+DECLARE @countCONS INT
+SET @countCONS = (SELECT
+COUNT(DISTINCT VISITSOURCEID)
+FROM 
+(SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) a
+WHERE UK_Start = 1) 
+
+SELECT 
+COUNT(DISTINCT a.VISITSOURCEID) AS Total_Leaving,
+COUNT(DISTINCT a.VISITSOURCEID)/CAST(@countCONS AS FLOAT) AS Pct_Leave
+FROM (SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) a
+LEFT JOIN (SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) b
+ON a.VisitSourceId = b.VisitSourceId AND a.PageVisitRank = b.PageVisitRank + 1
+WHERE 1=1
+AND b.VISITSOURCEID IN (SELECT DISTINCT VISITSOURCEID FROM (SELECT 
+URL_SHORT
+, VISITSOURCEID
+, RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) AS PageVisitRank 
+, CASE WHEN RANK() OVER (PARTITION BY VISITSOURCEID ORDER BY HITDATETIME) = 1 AND COUNTRY_NAME = 'United Kingdom' THEN 1 ELSE 0 END UK_Start
+, COUNTRY_NAME
+FROM MSS_U_MKTPOD_S.DEV_CKZ_ESG_WEB_JOURNEY) z WHERE z.UK_Start = 1)
+AND a.COUNTRY_NAME <> 'United Kingdom' 
+AND b.COUNTRY_NAME = 'United Kingdom'
+```
+
+```{r, include=FALSE}
+total_leaves <- pct_leaving %>% select(Total_Leaving) %>% .$Total_Leaving
+
+```
+
+```{r, include=FALSE}
+percent_leave <- pct_leaving %>% summarise(paste(round(Pct_Leave*100, 2),'%')) %>% as.character()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
